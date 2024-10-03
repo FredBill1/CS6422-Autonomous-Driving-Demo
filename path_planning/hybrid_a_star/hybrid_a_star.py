@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import cKDTree
 
-from ..ReedsSheppPath import reeds_shepp_path_planning as rs
+from ..reeds_shepp_path_planning import reeds_shepp_path_planning as rs
 from .car import BUBBLE_R, MAX_STEER, WB, check_car_collision, move, plot_car
 from .dynamic_programming_heuristic import calc_distance_heuristic
 

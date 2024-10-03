@@ -13,7 +13,7 @@ import cvxpy
 import matplotlib.pyplot as plt
 import numpy as np
 
-from PathPlanning.CubicSpline import cubic_spline_planner
+from path_planning.cubic_spline.cubic_spline_planner import calc_spline_course
 from utils.angle import angle_mod
 
 NX = 4  # x = x, y, v, yaw
@@ -486,7 +486,7 @@ def smooth_yaw(yaw):
 def get_straight_course(course_tick):
     ax = [0.0, 5.0, 10.0, 20.0, 30.0, 40.0, 50.0]
     ay = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    course_xs, course_ys, course_yaws, course_curvatures, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=course_tick)
+    course_xs, course_ys, course_yaws, course_curvatures, s = calc_spline_course(ax, ay, ds=course_tick)
 
     return course_xs, course_ys, course_yaws, course_curvatures
 
@@ -494,7 +494,7 @@ def get_straight_course(course_tick):
 def get_straight_course2(course_tick):
     ax = [0.0, -10.0, -20.0, -40.0, -50.0, -60.0, -70.0]
     ay = [0.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0]
-    course_xs, course_ys, course_yaws, course_curvatures, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=course_tick)
+    course_xs, course_ys, course_yaws, course_curvatures, s = calc_spline_course(ax, ay, ds=course_tick)
 
     return course_xs, course_ys, course_yaws, course_curvatures
 
@@ -502,7 +502,7 @@ def get_straight_course2(course_tick):
 def get_straight_course3(course_tick):
     ax = [0.0, -10.0, -20.0, -40.0, -50.0, -60.0, -70.0]
     ay = [0.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0]
-    course_xs, course_ys, course_yaws, course_curvatures, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=course_tick)
+    course_xs, course_ys, course_yaws, course_curvatures, s = calc_spline_course(ax, ay, ds=course_tick)
 
     course_yaws = [i - math.pi for i in course_yaws]
 
@@ -512,7 +512,7 @@ def get_straight_course3(course_tick):
 def get_forward_course(course_tick):
     ax = [0.0, 60.0, 125.0, 50.0, 75.0, 30.0, -10.0]
     ay = [0.0, 0.0, 50.0, 65.0, 30.0, 50.0, -20.0]
-    course_xs, course_ys, course_yaws, course_curvatures, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=course_tick)
+    course_xs, course_ys, course_yaws, course_curvatures, s = calc_spline_course(ax, ay, ds=course_tick)
 
     return course_xs, course_ys, course_yaws, course_curvatures
 
@@ -520,10 +520,10 @@ def get_forward_course(course_tick):
 def get_switch_back_course(course_tick):
     ax = [0.0, 30.0, 6.0, 20.0, 35.0]
     ay = [0.0, 0.0, 20.0, 35.0, 20.0]
-    course_xs, course_ys, course_yaws, course_curvatures, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=course_tick)
+    course_xs, course_ys, course_yaws, course_curvatures, s = calc_spline_course(ax, ay, ds=course_tick)
     ax = [35.0, 10.0, 0.0, 0.0]
     ay = [20.0, 30.0, 5.0, 0.0]
-    cx2, cy2, cyaw2, ck2, s2 = cubic_spline_planner.calc_spline_course(ax, ay, ds=course_tick)
+    cx2, cy2, cyaw2, ck2, s2 = calc_spline_course(ax, ay, ds=course_tick)
     cyaw2 = [i - math.pi for i in cyaw2]
     course_xs.extend(cx2)
     course_ys.extend(cy2)
