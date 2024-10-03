@@ -20,7 +20,7 @@ from utils.angle import angle_mod
 
 NX = 4  # x = x, y, v, yaw
 NU = 2  # a = [accel, steer]
-HORIZON_LENGTH = 3  # horizon length
+HORIZON_LENGTH = 5  # horizon length
 
 # mpc parameters
 R = np.diag([0.01, 0.01])  # input cost matrix
@@ -32,13 +32,15 @@ STOP_SPEED = 0.5 / 3.6  # stop speed
 MAX_TIME = 500.0  # max simulation time
 
 # iterative paramter
-MAX_ITER = 10  # Max iteration
+MAX_ITER = 3  # Max iteration
 DU_TH = 0.1  # iteration finish param
 
-TARGET_SPEED = 30.0 / 3.6  # [m/s] target speed
+TARGET_SPEED = 40.0 / 3.6  # [m/s] target speed
 N_IND_SEARCH = 20  # Search index number
 
-DT = 0.2  # [s] time tick
+DT = 0.1  # [s] time tick
+
+COURSE_TICK = 1.0  # course tick [m]
 
 # Vehicle parameters
 LENGTH = 4.5  # [m]
@@ -580,14 +582,13 @@ def main2():
     print(__file__ + " start!!")
     start = time.time()
 
-    course_tick = 1.0  # course tick
-    course_xs, course_ys, course_yaws, course_curvatures = get_straight_course3(course_tick)
+    course_xs, course_ys, course_yaws, course_curvatures = get_straight_course3(COURSE_TICK)
 
     speed_profile = calc_speed_profile(course_xs, course_ys, course_yaws, TARGET_SPEED)
 
     initial_state = State(x=course_xs[0], y=course_ys[0], yaw=0.0, v=0.0)
 
-    t, x, y, yaw, v, d, a = do_simulation(course_xs, course_ys, course_yaws, course_curvatures, speed_profile, course_tick, initial_state)
+    t, x, y, yaw, v, d, a = do_simulation(course_xs, course_ys, course_yaws, course_curvatures, speed_profile, COURSE_TICK, initial_state)
 
     elapsed_time = time.time() - start
     print(f"calc time:{elapsed_time:.6f} [sec]")
