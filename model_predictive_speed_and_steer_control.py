@@ -157,7 +157,7 @@ def plot_car(x, y, yaw, steer=0.0, cabcolor="-r", truckcolor="-k"):  # pragma: n
     plt.plot(x, y, "*")
 
 
-def update_state(state, a, delta):
+def update_state(state, a, delta, dt):
 
     # input check
     if delta >= MAX_STEER:
@@ -165,10 +165,10 @@ def update_state(state, a, delta):
     elif delta <= -MAX_STEER:
         delta = -MAX_STEER
 
-    state.x = state.x + state.v * math.cos(state.yaw) * DT
-    state.y = state.y + state.v * math.sin(state.yaw) * DT
-    state.yaw = state.yaw + state.v / WB * math.tan(delta) * DT
-    state.v = state.v + a * DT
+    state.x = state.x + state.v * math.cos(state.yaw) * dt
+    state.y = state.y + state.v * math.sin(state.yaw) * dt
+    state.yaw = state.yaw + state.v / WB * math.tan(delta) * dt
+    state.v = state.v + a * dt
 
     if state.v > MAX_SPEED:
         state.v = MAX_SPEED
@@ -212,7 +212,7 @@ def predict_motion(x0, oa, od, xref):
 
     state = State(x=x0[0], y=x0[1], yaw=x0[3], v=x0[2])
     for ai, di, i in zip(oa, od, range(1, HORIZON_LENGTH + 1)):
-        state = update_state(state, ai, di)
+        state = update_state(state, ai, di, DT)
         xbar[0, i] = state.x
         xbar[1, i] = state.y
         xbar[2, i] = state.v
@@ -406,7 +406,7 @@ def do_simulation(course_xs, course_ys, course_yaws, course_curvatures, speed_pr
         di, ai = 0.0, 0.0
         if odelta is not None:
             di, ai = odelta[0], oa[0]
-            state = update_state(state, ai, di)
+            state = update_state(state, ai, di, DT)
 
         time = time + DT
 
