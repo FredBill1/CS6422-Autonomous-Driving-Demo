@@ -301,7 +301,7 @@ def linear_mpc_control(xref, xbar, x0, dref):
     return oa, odelta, ox, oy, oyaw, ov
 
 
-def calc_ref_trajectory(state, course_xs, course_ys, course_yaws, course_curvatures, speed_profile, course_tick, pind):
+def calc_ref_trajectory(state, course_xs, course_ys, course_yaws, speed_profile, course_tick, pind):
     xref = np.zeros((NX, HORIZON_LENGTH + 1))
     dref = np.zeros((1, HORIZON_LENGTH + 1))
     ncourse = len(course_xs)
@@ -359,14 +359,13 @@ def check_goal(state, goal, tind, nind):
     return False
 
 
-def do_simulation(course_xs, course_ys, course_yaws, course_curvatures, speed_profile, course_tick, initial_state):
+def do_simulation(course_xs, course_ys, course_yaws, speed_profile, course_tick, initial_state):
     """
     Simulation
 
     course_xs: course x position list
     course_ys: course y position list
     course_yaws: course yaw position list
-    course_curvatures: course curvature list
     speed_profile: speed profile
     course_tick: course tick [m]
 
@@ -397,9 +396,7 @@ def do_simulation(course_xs, course_ys, course_yaws, course_curvatures, speed_pr
     course_yaws = smooth_yaw(course_yaws)
 
     while MAX_TIME >= time:
-        xref, target_ind, dref = calc_ref_trajectory(
-            state, course_xs, course_ys, course_yaws, course_curvatures, speed_profile, course_tick, target_ind
-        )
+        xref, target_ind, dref = calc_ref_trajectory(state, course_xs, course_ys, course_yaws, speed_profile, course_tick, target_ind)
 
         x0 = [state.x, state.y, state.v, state.yaw]  # current state
 
@@ -543,17 +540,17 @@ def main():
     start = time.time()
 
     course_tick = 1.0  # course tick
-    # course_xs, course_ys, course_yaws, course_curvatures = get_straight_course(course_tick)
-    # course_xs, course_ys, course_yaws, course_curvatures = get_straight_course2(course_tick)
-    # course_xs, course_ys, course_yaws, course_curvatures = get_straight_course3(course_tick)
-    # course_xs, course_ys, course_yaws, course_curvatures = get_forward_course(course_tick)
-    course_xs, course_ys, course_yaws, course_curvatures = get_switch_back_course(course_tick)
+    # course_xs, course_ys, course_yaws, _ = get_straight_course(course_tick)
+    # course_xs, course_ys, course_yaws, _ = get_straight_course2(course_tick)
+    # course_xs, course_ys, course_yaws, _ = get_straight_course3(course_tick)
+    # course_xs, course_ys, course_yaws, _ = get_forward_course(course_tick)
+    course_xs, course_ys, course_yaws, _ = get_switch_back_course(course_tick)
 
     speed_profile = calc_speed_profile(course_xs, course_ys, course_yaws, TARGET_SPEED)
 
     initial_state = State(x=course_xs[0], y=course_ys[0], yaw=course_yaws[0], v=0.0)
 
-    t, x, y, yaw, v, d, a = do_simulation(course_xs, course_ys, course_yaws, course_curvatures, speed_profile, course_tick, initial_state)
+    t, x, y, yaw, v, d, a = do_simulation(course_xs, course_ys, course_yaws, speed_profile, course_tick, initial_state)
 
     elapsed_time = time.time() - start
     print(f"calc time:{elapsed_time:.6f} [sec]")
@@ -582,13 +579,13 @@ def main2():
     print(__file__ + " start!!")
     start = time.time()
 
-    course_xs, course_ys, course_yaws, course_curvatures = get_straight_course3(COURSE_TICK)
+    course_xs, course_ys, course_yaws, _ = get_straight_course3(COURSE_TICK)
 
     speed_profile = calc_speed_profile(course_xs, course_ys, course_yaws, TARGET_SPEED)
 
     initial_state = State(x=course_xs[0], y=course_ys[0], yaw=0.0, v=0.0)
 
-    t, x, y, yaw, v, d, a = do_simulation(course_xs, course_ys, course_yaws, course_curvatures, speed_profile, COURSE_TICK, initial_state)
+    t, x, y, yaw, v, d, a = do_simulation(course_xs, course_ys, course_yaws, speed_profile, COURSE_TICK, initial_state)
 
     elapsed_time = time.time() - start
     print(f"calc time:{elapsed_time:.6f} [sec]")
