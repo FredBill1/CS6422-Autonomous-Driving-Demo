@@ -20,7 +20,7 @@ from utils.angle import angle_mod
 
 NX = 4  # x = x, y, v, yaw
 NU = 2  # a = [accel, steer]
-T = 3  # horizon length
+HORIZON_LENGTH = 3  # horizon length
 
 # mpc parameters
 R = np.diag([0.01, 0.01])  # input cost matrix
@@ -211,7 +211,7 @@ def predict_motion(x0, oa, od, xref):
         xbar[i, 0] = x0[i]
 
     state = State(x=x0[0], y=x0[1], yaw=x0[3], v=x0[2])
-    for ai, di, i in zip(oa, od, range(1, T + 1)):
+    for ai, di, i in zip(oa, od, range(1, HORIZON_LENGTH + 1)):
         state = update_state(state, ai, di)
         xbar[0, i] = state.x
         xbar[1, i] = state.y
@@ -228,8 +228,8 @@ def iterative_linear_mpc_control(xref, x0, dref, oa, od):
     ox, oy, oyaw, ov = None, None, None, None
 
     if oa is None or od is None:
-        oa = [0.0] * T
-        od = [0.0] * T
+        oa = [0.0] * HORIZON_LENGTH
+        od = [0.0] * HORIZON_LENGTH
 
     for _ in range(MAX_ITER):
         xbar = predict_motion(x0, oa, od, xref)
@@ -254,13 +254,13 @@ def linear_mpc_control(xref, xbar, x0, dref):
     dref: reference steer angle
     """
 
-    x = cvxpy.Variable((NX, T + 1))
-    u = cvxpy.Variable((NU, T))
+    x = cvxpy.Variable((NX, HORIZON_LENGTH + 1))
+    u = cvxpy.Variable((NU, HORIZON_LENGTH))
 
     cost = 0.0
     constraints = []
 
-    for t in range(T):
+    for t in range(HORIZON_LENGTH):
         cost += cvxpy.quad_form(u[:, t], R)
 
         if t != 0:
@@ -269,11 +269,11 @@ def linear_mpc_control(xref, xbar, x0, dref):
         A, B, C = get_linear_model_matrix(xbar[2, t], xbar[3, t], dref[0, t])
         constraints += [x[:, t + 1] == A @ x[:, t] + B @ u[:, t] + C]
 
-        if t < (T - 1):
+        if t < (HORIZON_LENGTH - 1):
             cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], Rd)
             constraints += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= MAX_DSTEER * DT]
 
-    cost += cvxpy.quad_form(xref[:, T] - x[:, T], Qf)
+    cost += cvxpy.quad_form(xref[:, HORIZON_LENGTH] - x[:, HORIZON_LENGTH], Qf)
 
     constraints.append(x[:, 0] == x0)
     constraints.append(x[2, :] <= MAX_SPEED)
@@ -300,8 +300,8 @@ def linear_mpc_control(xref, xbar, x0, dref):
 
 
 def calc_ref_trajectory(state, course_xs, course_ys, course_yaws, course_curvatures, speed_profile, course_tick, pind):
-    xref = np.zeros((NX, T + 1))
-    dref = np.zeros((1, T + 1))
+    xref = np.zeros((NX, HORIZON_LENGTH + 1))
+    dref = np.zeros((1, HORIZON_LENGTH + 1))
     ncourse = len(course_xs)
 
     ind, _ = calc_nearest_index(state, course_xs, course_ys, course_yaws, pind)
@@ -317,7 +317,7 @@ def calc_ref_trajectory(state, course_xs, course_ys, course_yaws, course_curvatu
 
     travel = 0.0
 
-    for i in range(1, T + 1):
+    for i in range(1, HORIZON_LENGTH + 1):
         travel += abs(state.v) * DT
         dind = int(round(travel / course_tick))
 
