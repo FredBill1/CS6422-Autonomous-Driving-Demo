@@ -9,6 +9,7 @@ author: Zheng Zh (@Zhengzh)
 import heapq
 import math
 from collections.abc import Generator
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,8 +37,19 @@ show_animation = True
 class Node:
 
     def __init__(
-        self, x_ind: int, y_ind: int, yaw_ind: int, direction: int, x_list, y_list, yaw_list, directions, steer=0.0, parent_index=None, cost=None
-    ):
+        self,
+        x_ind: int,
+        y_ind: int,
+        yaw_ind: int,
+        direction: int,
+        x_list: list[float],
+        y_list: list[float],
+        yaw_list: list[float],
+        directions: list[bool],
+        steer: float = 0.0,
+        parent_index: Optional[int] = None,
+        cost: Optional[float] = None,
+    ) -> None:
         self.x_index = x_ind
         self.y_index = y_ind
         self.yaw_index = yaw_ind
@@ -52,8 +64,7 @@ class Node:
 
 
 class Path:
-
-    def __init__(self, x_list, y_list, yaw_list, direction_list, cost):
+    def __init__(self, x_list: list[float], y_list: list[float], yaw_list: list[float], direction_list: list[bool], cost: float) -> None:
         self.x_list = x_list
         self.y_list = y_list
         self.yaw_list = yaw_list
@@ -62,17 +73,16 @@ class Path:
 
 
 class Config:
+    def __init__(self, obstacle_xs: list[float], obstacle_ys: list[float], xy_resolution: float, yaw_resolution: float) -> None:
+        min_x_m = min(obstacle_xs)
+        min_y_m = min(obstacle_ys)
+        max_x_m = max(obstacle_xs)
+        max_y_m = max(obstacle_ys)
 
-    def __init__(self, ox, oy, xy_resolution, yaw_resolution):
-        min_x_m = min(ox)
-        min_y_m = min(oy)
-        max_x_m = max(ox)
-        max_y_m = max(oy)
-
-        ox.append(min_x_m)
-        oy.append(min_y_m)
-        ox.append(max_x_m)
-        oy.append(max_y_m)
+        obstacle_xs.append(min_x_m)
+        obstacle_ys.append(min_y_m)
+        obstacle_xs.append(max_x_m)
+        obstacle_ys.append(max_y_m)
 
         self.min_x = round(min_x_m / xy_resolution)
         self.min_y = round(min_y_m / xy_resolution)
@@ -93,14 +103,28 @@ def calc_motion_inputs() -> Generator[tuple[float, int], None, None]:
             yield steer, d
 
 
-def get_neighbors(current: Node, config: Config, obstacle_xs: list[float], obstacle_ys: list[float], kd_tree: cKDTree) -> Generator[Node, None, None]:
+def get_neighbors(
+    current: Node,
+    config: Config,
+    obstacle_xs: list[float],
+    obstacle_ys: list[float],
+    kd_tree: cKDTree,
+) -> Generator[Node, None, None]:
     for steer, d in calc_motion_inputs():
         node = calc_next_node(current, steer, d, config, obstacle_xs, obstacle_ys, kd_tree)
         if node and verify_index(node, config):
             yield node
 
 
-def calc_next_node(current: Node, steer, direction, config: Config, obstacle_xs: list[float], obstacle_ys: list[float], kd_tree: cKDTree) -> Node:
+def calc_next_node(
+    current: Node,
+    steer: float,
+    direction: int,
+    config: Config,
+    obstacle_xs: list[float],
+    obstacle_ys: list[float],
+    kd_tree: cKDTree,
+) -> Node:
     x, y, yaw = current.x_list[-1], current.y_list[-1], current.yaw_list[-1]
 
     arc_l = XY_GRID_RESOLUTION * 1.5
@@ -137,7 +161,7 @@ def calc_next_node(current: Node, steer, direction, config: Config, obstacle_xs:
     return node
 
 
-def analytic_expansion(current, goal, ox, oy, kd_tree):
+def analytic_expansion(current: Node, goal: Node, obstacle_xs: list[float], obstacle_ys: list[float], kd_tree: cKDTree) -> rs.Path:
     start_x = current.x_list[-1]
     start_y = current.y_list[-1]
     start_yaw = current.yaw_list[-1]
@@ -155,7 +179,7 @@ def analytic_expansion(current, goal, ox, oy, kd_tree):
     best_path, best = None, None
 
     for path in paths:
-        if check_car_collision(path.x, path.y, path.yaw, ox, oy, kd_tree):
+        if check_car_collision(path.x, path.y, path.yaw, obstacle_xs, obstacle_ys, kd_tree):
             cost = calc_rs_path_cost(path)
             if not best or best > cost:
                 best = cost
@@ -164,8 +188,10 @@ def analytic_expansion(current, goal, ox, oy, kd_tree):
     return best_path
 
 
-def update_node_with_analytic_expansion(current, goal, c, ox, oy, kd_tree):
-    path = analytic_expansion(current, goal, ox, oy, kd_tree)
+def update_node_with_analytic_expansion(
+    current: Node, goal: Node, config: Config, obstacle_xs, obstacle_ys, kd_tree: cKDTree
+) -> tuple[bool, Optional[Node]]:
+    path = analytic_expansion(current, goal, obstacle_xs, obstacle_ys, kd_tree)
 
     if path:
         if show_animation:
@@ -175,7 +201,7 @@ def update_node_with_analytic_expansion(current, goal, c, ox, oy, kd_tree):
         f_yaw = path.yaw[1:]
 
         f_cost = current.cost + calc_rs_path_cost(path)
-        f_parent_index = calc_index(current, c)
+        f_parent_index = calc_index(current, config)
 
         fd = []
         for d in path.directions[1:]:
@@ -200,7 +226,7 @@ def update_node_with_analytic_expansion(current, goal, c, ox, oy, kd_tree):
     return False, None
 
 
-def calc_rs_path_cost(reed_shepp_path):
+def calc_rs_path_cost(reed_shepp_path: rs.Path) -> float:
     cost = 0.0
     for length in reed_shepp_path.lengths:
         if length >= 0:  # forward

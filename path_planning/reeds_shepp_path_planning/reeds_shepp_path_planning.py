@@ -405,7 +405,7 @@ def interpolate(dist, length, mode, max_curvature, origin_x, origin_y, origin_ya
     return x, y, yaw, 1 if length > 0.0 else -1
 
 
-def calc_paths(sx, sy, syaw, gx, gy, gyaw, maxc, step_size):
+def calc_paths(sx, sy, syaw, gx, gy, gyaw, maxc, step_size) -> list[Path]:
     q0 = [sx, sy, syaw]
     q1 = [gx, gy, gyaw]
 
