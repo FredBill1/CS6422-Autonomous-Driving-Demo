@@ -17,8 +17,7 @@ show_animation = False
 
 
 class Node:
-
-    def __init__(self, x, y, cost, parent_index):
+    def __init__(self, x: int, y: int, cost: float, parent_index: int) -> None:
         self.x = x
         self.y = y
         self.cost = cost
