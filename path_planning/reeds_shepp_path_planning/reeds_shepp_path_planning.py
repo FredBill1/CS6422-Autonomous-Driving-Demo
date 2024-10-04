@@ -38,19 +38,8 @@ def plot_arrow(x, y, yaw, length=1.0, width=0.5, fc="r", ec="k"):
         plt.plot(x, y)
 
 
-def pi_2_pi(x):
+def pi_2_pi(x: float) -> float:
     return angle_mod(x)
-
-
-def mod2pi(x):
-    # Be consistent with fmod in cplusplus here.
-    v = np.mod(x, np.copysign(2.0 * math.pi, x))
-    if v < -math.pi:
-        v += 2.0 * math.pi
-    else:
-        if v > math.pi:
-            v -= 2.0 * math.pi
-    return v
 
 
 def set_path(paths, lengths, ctypes, step_size):
@@ -83,7 +72,7 @@ def polar(x, y):
 def left_straight_left(x, y, phi):
     u, t = polar(x - math.sin(phi), y - 1.0 + math.cos(phi))
     if 0.0 <= t <= math.pi:
-        v = mod2pi(phi - t)
+        v = pi_2_pi(phi - t)
         if 0.0 <= v <= math.pi:
             return True, [t, u, v], ["L", "S", "L"]
 
@@ -96,8 +85,8 @@ def left_straight_right(x, y, phi):
     if u1 >= 4.0:
         u = math.sqrt(u1 - 4.0)
         theta = math.atan2(2.0, u)
-        t = mod2pi(t1 + theta)
-        v = mod2pi(t - phi)
+        t = pi_2_pi(t1 + theta)
+        v = pi_2_pi(t - phi)
 
         if (t >= 0.0) and (v >= 0.0):
             return True, [t, u, v], ["L", "S", "R"]
@@ -112,9 +101,9 @@ def left_x_right_x_left(x, y, phi):
 
     if u1 <= 4.0:
         A = math.acos(0.25 * u1)
-        t = mod2pi(A + theta + math.pi / 2)
-        u = mod2pi(math.pi - 2 * A)
-        v = mod2pi(phi - t - u)
+        t = pi_2_pi(A + theta + math.pi / 2)
+        u = pi_2_pi(math.pi - 2 * A)
+        v = pi_2_pi(phi - t - u)
         return True, [t, -u, v], ["L", "R", "L"]
 
     return False, [], []
@@ -127,9 +116,9 @@ def left_x_right_left(x, y, phi):
 
     if u1 <= 4.0:
         A = math.acos(0.25 * u1)
-        t = mod2pi(A + theta + math.pi / 2)
-        u = mod2pi(math.pi - 2 * A)
-        v = mod2pi(-phi + t + u)
+        t = pi_2_pi(A + theta + math.pi / 2)
+        u = pi_2_pi(math.pi - 2 * A)
+        v = pi_2_pi(-phi + t + u)
         return True, [t, -u, -v], ["L", "R", "L"]
 
     return False, [], []
@@ -143,8 +132,8 @@ def left_right_x_left(x, y, phi):
     if u1 <= 4.0:
         u = math.acos(1 - u1**2 * 0.125)
         A = math.asin(2 * math.sin(u) / u1)
-        t = mod2pi(-A + theta + math.pi / 2)
-        v = mod2pi(t - u - phi)
+        t = pi_2_pi(-A + theta + math.pi / 2)
+        v = pi_2_pi(t - u - phi)
         return True, [t, u, -v], ["L", "R", "L"]
 
     return False, [], []
@@ -159,9 +148,9 @@ def left_right_x_left_right(x, y, phi):
     # Solutions do not exist for u1 > 4
     if u1 <= 2:
         A = math.acos((u1 + 2) * 0.25)
-        t = mod2pi(theta + A + math.pi / 2)
-        u = mod2pi(A)
-        v = mod2pi(phi - t + 2 * u)
+        t = pi_2_pi(theta + A + math.pi / 2)
+        u = pi_2_pi(A)
+        v = pi_2_pi(phi - t + 2 * u)
         if (t >= 0) and (u >= 0) and (v >= 0):
             return True, [t, u, -u, -v], ["L", "R", "L", "R"]
 
@@ -177,8 +166,8 @@ def left_x_right_left_x_right(x, y, phi):
     if 0 <= u2 <= 1:
         u = math.acos(u2)
         A = math.asin(2 * math.sin(u) / u1)
-        t = mod2pi(theta + A + math.pi / 2)
-        v = mod2pi(t - phi)
+        t = pi_2_pi(theta + A + math.pi / 2)
+        v = pi_2_pi(t - phi)
         if (t >= 0) and (v >= 0):
             return True, [t, -u, -u, v], ["L", "R", "L", "R"]
 
@@ -193,8 +182,8 @@ def left_x_right90_straight_left(x, y, phi):
     if u1 >= 2.0:
         u = math.sqrt(u1**2 - 4) - 2
         A = math.atan2(2, math.sqrt(u1**2 - 4))
-        t = mod2pi(theta + A + math.pi / 2)
-        v = mod2pi(t - phi + math.pi / 2)
+        t = pi_2_pi(theta + A + math.pi / 2)
+        v = pi_2_pi(t - phi + math.pi / 2)
         if (t >= 0) and (v >= 0):
             return True, [t, -math.pi / 2, -u, -v], ["L", "R", "S", "L"]
 
@@ -209,8 +198,8 @@ def left_straight_right90_x_left(x, y, phi):
     if u1 >= 2.0:
         u = math.sqrt(u1**2 - 4) - 2
         A = math.atan2(math.sqrt(u1**2 - 4), 2)
-        t = mod2pi(theta - A + math.pi / 2)
-        v = mod2pi(t - phi - math.pi / 2)
+        t = pi_2_pi(theta - A + math.pi / 2)
+        v = pi_2_pi(t - phi - math.pi / 2)
         if (t >= 0) and (v >= 0):
             return True, [t, u, math.pi / 2, -v], ["L", "S", "R", "L"]
 
@@ -223,9 +212,9 @@ def left_x_right90_straight_right(x, y, phi):
     u1, theta = polar(zeta, eeta)
 
     if u1 >= 2.0:
-        t = mod2pi(theta + math.pi / 2)
+        t = pi_2_pi(theta + math.pi / 2)
         u = u1 - 2
-        v = mod2pi(phi - t - math.pi / 2)
+        v = pi_2_pi(phi - t - math.pi / 2)
         if (t >= 0) and (v >= 0):
             return True, [t, -math.pi / 2, -u, -v], ["L", "R", "S", "R"]
 
@@ -238,9 +227,9 @@ def left_straight_left90_x_right(x, y, phi):
     u1, theta = polar(zeta, eeta)
 
     if u1 >= 2.0:
-        t = mod2pi(theta)
+        t = pi_2_pi(theta)
         u = u1 - 2
-        v = mod2pi(phi - t - math.pi / 2)
+        v = pi_2_pi(phi - t - math.pi / 2)
         if (t >= 0) and (v >= 0):
             return True, [t, u, math.pi / 2, -v], ["L", "S", "L", "R"]
 
@@ -255,8 +244,8 @@ def left_x_right90_straight_left90_x_right(x, y, phi):
     if u1 >= 4.0:
         u = math.sqrt(u1**2 - 4) - 4
         A = math.atan2(2, math.sqrt(u1**2 - 4))
-        t = mod2pi(theta + A + math.pi / 2)
-        v = mod2pi(t - phi)
+        t = pi_2_pi(theta + A + math.pi / 2)
+        v = pi_2_pi(t - phi)
         if (t >= 0) and (v >= 0):
             return True, [t, -math.pi / 2, -u, -math.pi / 2, v], ["L", "R", "S", "L", "R"]
 
