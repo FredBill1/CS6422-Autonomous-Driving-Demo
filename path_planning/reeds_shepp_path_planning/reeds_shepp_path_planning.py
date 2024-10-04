@@ -38,25 +38,6 @@ class Path:
     directions: list[int] = field(default_factory=list)  # directions (1:forward, -1:backward)
 
 
-def plot_arrow(
-    x: float | list[float],
-    y: float | list[float],
-    yaw: float | list[float],
-    length: float = 1.0,
-    width: float = 0.5,
-    fc="r",
-    ec="k",
-) -> None:
-    if isinstance(x, list):
-        for ix, iy, iyaw in zip(x, y, yaw):
-            plot_arrow(ix, iy, iyaw)
-    else:
-        plt.arrow(
-            x, y, length * math.cos(yaw), length * math.sin(yaw), fc=fc, ec=ec, head_width=width, head_length=width
-        )
-        plt.plot(x, y)
-
-
 def pi_2_pi(x: float) -> float:
     return angle_mod(x)
 
@@ -321,13 +302,13 @@ def reflect(steering_directions: list[CourseSegmentType]) -> list[CourseSegmentT
 
 
 def generate_path(
-    q0: tuple[float, float, float], q1: tuple[float, float, float], max_curvature: float, step_size: float
+    start: tuple[float, float, float], goal: tuple[float, float, float], max_curvature: float, step_size: float
 ) -> list[Path]:
-    dx = q1[0] - q0[0]
-    dy = q1[1] - q0[1]
-    dth = q1[2] - q0[2]
-    c = math.cos(q0[2])
-    s = math.sin(q0[2])
+    dx = goal[0] - start[0]
+    dy = goal[1] - start[1]
+    dyaw = goal[2] - start[2]
+    c = math.cos(start[2])
+    s = math.sin(start[2])
     x = (c * dx + s * dy) * max_curvature
     y = (-s * dx + c * dy) * max_curvature
     step_size *= max_curvature
@@ -349,7 +330,7 @@ def generate_path(
     ]  # CCSCC
 
     for path_func in path_functions:
-        flag, travel_distances, steering_dirns = path_func(x, y, dth)
+        flag, travel_distances, steering_dirns = path_func(x, y, dyaw)
         if flag:
             for distance in travel_distances:
                 if 0.1 * sum([abs(d) for d in travel_distances]) < abs(distance) < step_size:
@@ -357,7 +338,7 @@ def generate_path(
                     return []
             paths = set_path(paths, travel_distances, steering_dirns, step_size)
 
-        flag, travel_distances, steering_dirns = path_func(-x, y, -dth)
+        flag, travel_distances, steering_dirns = path_func(-x, y, -dyaw)
         if flag:
             for distance in travel_distances:
                 if 0.1 * sum([abs(d) for d in travel_distances]) < abs(distance) < step_size:
@@ -366,7 +347,7 @@ def generate_path(
             travel_distances = timeflip(travel_distances)
             paths = set_path(paths, travel_distances, steering_dirns, step_size)
 
-        flag, travel_distances, steering_dirns = path_func(x, -y, -dth)
+        flag, travel_distances, steering_dirns = path_func(x, -y, -dyaw)
         if flag:
             for distance in travel_distances:
                 if 0.1 * sum([abs(d) for d in travel_distances]) < abs(distance) < step_size:
@@ -375,7 +356,7 @@ def generate_path(
             steering_dirns = reflect(steering_dirns)
             paths = set_path(paths, travel_distances, steering_dirns, step_size)
 
-        flag, travel_distances, steering_dirns = path_func(-x, -y, dth)
+        flag, travel_distances, steering_dirns = path_func(-x, -y, dyaw)
         if flag:
             for distance in travel_distances:
                 if 0.1 * sum([abs(d) for d in travel_distances]) < abs(distance) < step_size:
@@ -423,7 +404,13 @@ def generate_local_course(
 
 
 def interpolate(
-    dist: float, length: float, ctype: CourseSegmentType, max_curvature: float, origin_x: float, origin_y: float, origin_yaw: float
+    dist: float,
+    length: float,
+    ctype: CourseSegmentType,
+    max_curvature: float,
+    origin_x: float,
+    origin_y: float,
+    origin_yaw: float,
 ) -> tuple[float, float, float, int]:
     if ctype == CourseSegmentType.STRAIGHT:
         x = origin_x + dist / max_curvature * math.cos(origin_yaw)
@@ -457,17 +444,17 @@ def calc_paths(
     max_curvature: float,
     step_size: float,
 ) -> list[Path]:
-    q0 = (start_x, start_y, start_yaw)
-    q1 = (goal_x, goal_y, goal_yaw)
+    start = (start_x, start_y, start_yaw)
+    goal = (goal_x, goal_y, goal_yaw)
 
-    paths = generate_path(q0, q1, max_curvature, step_size)
+    paths = generate_path(start, goal, max_curvature, step_size)
     for path in paths:
         xs, ys, yaws, directions = generate_local_course(path.lengths, path.ctypes, max_curvature, step_size)
 
         # convert global coordinate
-        path.x = [math.cos(-q0[2]) * ix + math.sin(-q0[2]) * iy + q0[0] for (ix, iy) in zip(xs, ys)]
-        path.y = [-math.sin(-q0[2]) * ix + math.cos(-q0[2]) * iy + q0[1] for (ix, iy) in zip(xs, ys)]
-        path.yaw = [pi_2_pi(yaw + q0[2]) for yaw in yaws]
+        path.x = [math.cos(-start[2]) * ix + math.sin(-start[2]) * iy + start[0] for (ix, iy) in zip(xs, ys)]
+        path.y = [-math.sin(-start[2]) * ix + math.cos(-start[2]) * iy + start[1] for (ix, iy) in zip(xs, ys)]
+        path.yaw = [pi_2_pi(yaw + start[2]) for yaw in yaws]
         path.directions = directions
         path.lengths = [length / max_curvature for length in path.lengths]
         path.L = path.L / max_curvature
@@ -494,6 +481,25 @@ def reeds_shepp_path_planning(
     b_path = paths[best_path_index]
 
     return b_path.x, b_path.y, b_path.yaw, b_path.ctypes, b_path.lengths
+
+
+def plot_arrow(
+    x: float | list[float],
+    y: float | list[float],
+    yaw: float | list[float],
+    length: float = 1.0,
+    width: float = 0.5,
+    fc="r",
+    ec="k",
+) -> None:
+    if isinstance(x, list):
+        for ix, iy, iyaw in zip(x, y, yaw):
+            plot_arrow(ix, iy, iyaw)
+    else:
+        plt.arrow(
+            x, y, length * math.cos(yaw), length * math.sin(yaw), fc=fc, ec=ec, head_width=width, head_length=width
+        )
+        plt.plot(x, y)
 
 
 def main():
