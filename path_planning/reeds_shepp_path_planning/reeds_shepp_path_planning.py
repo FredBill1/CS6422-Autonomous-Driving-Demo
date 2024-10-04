@@ -30,7 +30,7 @@ class CourseSegmentType(StrEnum):
 @dataclass
 class Path:
     lengths: list[float] = field(default_factory=list)  # course segment length (negative value is backward segment)
-    ctypes: list[CourseSegmentType] = field(default_factory=list)  # course segment type
+    course_segment_types: list[CourseSegmentType] = field(default_factory=list)  # course segment type
     L: float = 0.0  # Total lengths of the path
     x: list[float] = field(default_factory=list)  # x positions
     y: list[float] = field(default_factory=list)  # y positions
@@ -42,15 +42,17 @@ def pi_2_pi(x: float) -> float:
     return angle_mod(x)
 
 
-def set_path(paths: list[Path], lengths: list[float], ctypes: list[CourseSegmentType], step_size: float) -> list[Path]:
+def set_path(
+    paths: list[Path], lengths: list[float], course_segment_types: list[CourseSegmentType], step_size: float
+) -> list[Path]:
     path = Path()
-    path.ctypes = ctypes
+    path.course_segment_types = course_segment_types
     path.lengths = lengths
     path.L = sum(np.abs(lengths))
 
     # check same path exist
     for i_path in paths:
-        type_is_same = i_path.ctypes == path.ctypes
+        type_is_same = i_path.course_segment_types == path.course_segment_types
         length_is_close = (sum(np.abs(i_path.lengths)) - path.L) <= step_size
         if type_is_same and length_is_close:
             return paths  # same path found, so do not insert path
@@ -381,17 +383,17 @@ def calc_interpolate_dists_list(lengths: list[float], step_size: float) -> list[
 
 
 def generate_local_course(
-    lengths: list[float], ctypes: list[CourseSegmentType], max_curvature: float, step_size: float
+    lengths: list[float], course_segment_types: list[CourseSegmentType], max_curvature: float, step_size: float
 ) -> tuple[list[float], list[float], list[float], list[int]]:
     interpolate_dists_list = calc_interpolate_dists_list(lengths, step_size * max_curvature)
 
     origin_x, origin_y, origin_yaw = 0.0, 0.0, 0.0
 
     xs, ys, yaws, directions = [], [], [], []
-    for interp_dists, ctype, length in zip(interpolate_dists_list, ctypes, lengths):
+    for interp_dists, course_segment_type, length in zip(interpolate_dists_list, course_segment_types, lengths):
 
         for dist in interp_dists:
-            x, y, yaw, direction = interpolate(dist, length, ctype, max_curvature, origin_x, origin_y, origin_yaw)
+            x, y, yaw, direction = interpolate(dist, length, course_segment_type, max_curvature, origin_x, origin_y, origin_yaw)
             xs.append(x)
             ys.append(y)
             yaws.append(yaw)
@@ -406,13 +408,13 @@ def generate_local_course(
 def interpolate(
     dist: float,
     length: float,
-    ctype: CourseSegmentType,
+    course_segment_type: CourseSegmentType,
     max_curvature: float,
     origin_x: float,
     origin_y: float,
     origin_yaw: float,
 ) -> tuple[float, float, float, int]:
-    if ctype == CourseSegmentType.STRAIGHT:
+    if course_segment_type == CourseSegmentType.STRAIGHT:
         x = origin_x + dist / max_curvature * math.cos(origin_yaw)
         y = origin_y + dist / max_curvature * math.sin(origin_yaw)
         yaw = origin_yaw
@@ -420,10 +422,10 @@ def interpolate(
         ldx = math.sin(dist) / max_curvature
         ldy = 0.0
         yaw = None
-        if ctype == CourseSegmentType.LEFT:  # left turn
+        if course_segment_type == CourseSegmentType.LEFT:  # left turn
             ldy = (1.0 - math.cos(dist)) / max_curvature
             yaw = origin_yaw + dist
-        elif ctype == CourseSegmentType.RIGHT:  # right turn
+        elif course_segment_type == CourseSegmentType.RIGHT:  # right turn
             ldy = (1.0 - math.cos(dist)) / -max_curvature
             yaw = origin_yaw - dist
         gdx = math.cos(-origin_yaw) * ldx + math.sin(-origin_yaw) * ldy
@@ -449,7 +451,9 @@ def calc_paths(
 
     paths = generate_path(start, goal, max_curvature, step_size)
     for path in paths:
-        xs, ys, yaws, directions = generate_local_course(path.lengths, path.ctypes, max_curvature, step_size)
+        xs, ys, yaws, directions = generate_local_course(
+            path.lengths, path.course_segment_types, max_curvature, step_size
+        )
 
         # convert global coordinate
         path.x = [math.cos(-start[2]) * ix + math.sin(-start[2]) * iy + start[0] for (ix, iy) in zip(xs, ys)]
@@ -480,7 +484,7 @@ def reeds_shepp_path_planning(
     best_path_index = paths.index(min(paths, key=lambda p: abs(p.L)))
     b_path = paths[best_path_index]
 
-    return b_path.x, b_path.y, b_path.yaw, b_path.ctypes, b_path.lengths
+    return b_path.x, b_path.y, b_path.yaw, b_path.course_segment_types, b_path.lengths
 
 
 def plot_arrow(

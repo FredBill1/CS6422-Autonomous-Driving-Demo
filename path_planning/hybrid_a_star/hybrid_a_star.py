@@ -246,21 +246,21 @@ def calc_rs_path_cost(reed_shepp_path: rs.Path) -> float:
             cost += SB_COST
 
     # steer penalty
-    for course_type in reed_shepp_path.ctypes:
+    for course_type in reed_shepp_path.course_segment_types:
         if course_type != rs.CourseSegmentType.STRAIGHT:  # curve
             cost += STEER_COST * abs(MAX_STEER)
 
     # ==steer change penalty
     # calc steer profile
-    n_ctypes = len(reed_shepp_path.ctypes)
-    u_list = [0.0] * n_ctypes
-    for i in range(n_ctypes):
-        if reed_shepp_path.ctypes[i] == rs.CourseSegmentType.RIGHT:
+    n_course_segment_types = len(reed_shepp_path.course_segment_types)
+    u_list = [0.0] * n_course_segment_types
+    for i in range(n_course_segment_types):
+        if reed_shepp_path.course_segment_types[i] == rs.CourseSegmentType.RIGHT:
             u_list[i] = -MAX_STEER
-        elif reed_shepp_path.ctypes[i] == rs.CourseSegmentType.LEFT:
+        elif reed_shepp_path.course_segment_types[i] == rs.CourseSegmentType.LEFT:
             u_list[i] = MAX_STEER
 
-    for i in range(len(reed_shepp_path.ctypes) - 1):
+    for i in range(len(reed_shepp_path.course_segment_types) - 1):
         cost += STEER_CHANGE_COST * abs(u_list[i + 1] - u_list[i])
 
     return cost
