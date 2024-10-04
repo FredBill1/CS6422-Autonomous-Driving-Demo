@@ -61,17 +61,17 @@ class Path:
 
 class Config:
     def __init__(
-        self, obstacle_xs: list[float], obstacle_ys: list[float], xy_resolution: float, yaw_resolution: float
+        self, obstacle_x_list: list[float], obstacle_y_list: list[float], xy_resolution: float, yaw_resolution: float
     ) -> None:
-        min_x_m = min(obstacle_xs)
-        min_y_m = min(obstacle_ys)
-        max_x_m = max(obstacle_xs)
-        max_y_m = max(obstacle_ys)
+        min_x_m = min(obstacle_x_list)
+        min_y_m = min(obstacle_y_list)
+        max_x_m = max(obstacle_x_list)
+        max_y_m = max(obstacle_y_list)
 
-        obstacle_xs.append(min_x_m)
-        obstacle_ys.append(min_y_m)
-        obstacle_xs.append(max_x_m)
-        obstacle_ys.append(max_y_m)
+        obstacle_x_list.append(min_x_m)
+        obstacle_y_list.append(min_y_m)
+        obstacle_x_list.append(max_x_m)
+        obstacle_y_list.append(max_y_m)
 
         self.min_x = round(min_x_m / xy_resolution)
         self.min_y = round(min_y_m / xy_resolution)
@@ -95,12 +95,12 @@ def calc_motion_inputs() -> Generator[tuple[float, int], None, None]:
 def get_neighbors(
     current: Node,
     config: Config,
-    obstacle_xs: list[float],
-    obstacle_ys: list[float],
+    obstacle_x_list: list[float],
+    obstacle_y_list: list[float],
     kd_tree: cKDTree,
 ) -> Generator[Node, None, None]:
     for steer, d in calc_motion_inputs():
-        node = calc_next_node(current, steer, d, config, obstacle_xs, obstacle_ys, kd_tree)
+        node = calc_next_node(current, steer, d, config, obstacle_x_list, obstacle_y_list, kd_tree)
         if node and verify_index(node, config):
             yield node
 
@@ -110,8 +110,8 @@ def calc_next_node(
     steer: float,
     direction: int,
     config: Config,
-    obstacle_xs: list[float],
-    obstacle_ys: list[float],
+    obstacle_x_list: list[float],
+    obstacle_y_list: list[float],
     kd_tree: cKDTree,
 ) -> Node:
     x, y, yaw = current.x_list[-1], current.y_list[-1], current.yaw_list[-1]
@@ -124,7 +124,7 @@ def calc_next_node(
         y_list.append(y)
         yaw_list.append(yaw)
 
-    if not check_car_collision(x_list, y_list, yaw_list, obstacle_xs, obstacle_ys, kd_tree):
+    if not check_car_collision(x_list, y_list, yaw_list, obstacle_x_list, obstacle_y_list, kd_tree):
         return None
 
     d = direction == 1
@@ -163,7 +163,7 @@ def calc_next_node(
 
 
 def analytic_expansion(
-    current: Node, goal: Node, obstacle_xs: list[float], obstacle_ys: list[float], kd_tree: cKDTree
+    current: Node, goal: Node, obstacle_x_list: list[float], obstacle_y_list: list[float], kd_tree: cKDTree
 ) -> rs.Path:
     start_x = current.x_list[-1]
     start_y = current.y_list[-1]
@@ -184,7 +184,7 @@ def analytic_expansion(
     best_path, best = None, None
 
     for path in paths:
-        if check_car_collision(path.x, path.y, path.yaw, obstacle_xs, obstacle_ys, kd_tree):
+        if check_car_collision(path.x, path.y, path.yaw, obstacle_x_list, obstacle_y_list, kd_tree):
             cost = calc_rs_path_cost(path)
             if not best or best > cost:
                 best = cost
@@ -194,9 +194,14 @@ def analytic_expansion(
 
 
 def update_node_with_analytic_expansion(
-    current: Node, goal: Node, config: Config, obstacle_xs, obstacle_ys, kd_tree: cKDTree
+    current: Node,
+    goal: Node,
+    config: Config,
+    obstacle_x_list: list[float],
+    obstacle_y_list: list[float],
+    kd_tree: cKDTree,
 ) -> tuple[bool, Optional[Node]]:
-    path = analytic_expansion(current, goal, obstacle_xs, obstacle_ys, kd_tree)
+    path = analytic_expansion(current, goal, obstacle_x_list, obstacle_y_list, kd_tree)
 
     if path:
         if show_animation:
@@ -269,26 +274,26 @@ def calc_rs_path_cost(reed_shepp_path: rs.Path) -> float:
 def hybrid_a_star_planning(
     start: tuple[float, float, float],
     goal: tuple[float, float, float],
-    obstacle_xs: list[float],
-    obstacle_ys: list[float],
+    obstacle_x_list: list[float],
+    obstacle_y_list: list[float],
     xy_resolution: float,
     yaw_resolution: float,
 ) -> Path:
     """
     start: start node
     goal: goal node
-    obstacle_xs: x position list of Obstacles [m]
-    obstacle_ys: y position list of Obstacles [m]
+    obstacle_x_list: x position list of Obstacles [m]
+    obstacle_y_list: y position list of Obstacles [m]
     xy_resolution: grid resolution [m]
     yaw_resolution: yaw angle resolution [rad]
     """
 
     start[2], goal[2] = rs.pi_2_pi(start[2]), rs.pi_2_pi(goal[2])
-    tmp_obstacle_xs, tmp_obstacle_ys = obstacle_xs[:], obstacle_ys[:]
+    tmp_obstacle_x_list, tmp_obstacle_y_list = obstacle_x_list[:], obstacle_y_list[:]
 
-    obstacle_kd_tree = cKDTree(np.vstack((tmp_obstacle_xs, tmp_obstacle_ys)).T)
+    obstacle_kd_tree = cKDTree(np.vstack((tmp_obstacle_x_list, tmp_obstacle_y_list)).T)
 
-    config = Config(tmp_obstacle_xs, tmp_obstacle_ys, xy_resolution, yaw_resolution)
+    config = Config(tmp_obstacle_x_list, tmp_obstacle_y_list, xy_resolution, yaw_resolution)
 
     start_node = Node(
         round(start[0] / xy_resolution),
@@ -315,7 +320,7 @@ def hybrid_a_star_planning(
     openList: dict[int, Node] = {}
     closedList: dict[int, Node] = {}
     h_dp = calc_distance_heuristic(
-        goal_node.x_list[-1], goal_node.y_list[-1], obstacle_xs, obstacle_ys, xy_resolution, BUBBLE_R
+        goal_node.x_list[-1], goal_node.y_list[-1], obstacle_x_list, obstacle_y_list, xy_resolution, BUBBLE_R
     )
 
     pq: list[tuple[float, int]] = []
@@ -345,14 +350,14 @@ def hybrid_a_star_planning(
                 plt.pause(0.001)
 
         is_updated, final_path = update_node_with_analytic_expansion(
-            current, goal_node, config, obstacle_xs, obstacle_ys, obstacle_kd_tree
+            current, goal_node, config, obstacle_x_list, obstacle_y_list, obstacle_kd_tree
         )
 
         if is_updated:
             print("path found")
             break
 
-        for neighbor in get_neighbors(current, config, obstacle_xs, obstacle_ys, obstacle_kd_tree):
+        for neighbor in get_neighbors(current, config, obstacle_x_list, obstacle_y_list, obstacle_kd_tree):
             neighbor_index = calc_index(neighbor, config)
             if neighbor_index in closedList:
                 continue

@@ -33,8 +33,8 @@ def check_car_collision(
     x_list: list[float],
     y_list: list[float],
     yaw_list: list[float],
-    obstacle_xs: list[float],
-    obstacle_ys: list[float],
+    obstacle_x_list: list[float],
+    obstacle_y_list: list[float],
     kd_tree: cKDTree,
 ) -> bool:
     for i_x, i_y, i_yaw in zip(x_list, y_list, yaw_list):
@@ -46,16 +46,16 @@ def check_car_collision(
         if not ids:
             continue
 
-        if not rectangle_check(i_x, i_y, i_yaw, [obstacle_xs[i] for i in ids], [obstacle_ys[i] for i in ids]):
+        if not rectangle_check(i_x, i_y, i_yaw, [obstacle_x_list[i] for i in ids], [obstacle_y_list[i] for i in ids]):
             return False  # collision
 
     return True  # no collision
 
 
-def rectangle_check(x: float, y: float, yaw: float, obstacle_xs: list[float], obstacle_ys: list[float]) -> bool:
+def rectangle_check(x: float, y: float, yaw: float, obstacle_x_list: list[float], obstacle_y_list: list[float]) -> bool:
     # transform obstacles to base link frame
     rot = rot_mat_2d(yaw)
-    for iox, ioy in zip(obstacle_xs, obstacle_ys):
+    for iox, ioy in zip(obstacle_x_list, obstacle_y_list):
         tx = iox - x
         ty = ioy - y
         converted_xy = np.stack([tx, ty]).T @ rot

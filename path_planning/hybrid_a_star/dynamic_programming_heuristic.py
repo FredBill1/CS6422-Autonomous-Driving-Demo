@@ -28,8 +28,8 @@ class Node:
 def calc_distance_heuristic(
     goal_x: float,
     goal_y: float,
-    obstacle_xs: list[float],
-    obstacle_ys: list[float],
+    obstacle_x_list: list[float],
+    obstacle_y_list: list[float],
     resolution: float,
     rr: float,
 ) -> dict[int, Node]:
@@ -43,10 +43,12 @@ def calc_distance_heuristic(
     """
 
     goal_node = Node(round(goal_x / resolution), round(goal_y / resolution), 0.0, -1)
-    obstacle_xs = [iox / resolution for iox in obstacle_xs]
-    obstacle_ys = [ioy / resolution for ioy in obstacle_ys]
+    obstacle_x_list = [iox / resolution for iox in obstacle_x_list]
+    obstacle_y_list = [ioy / resolution for ioy in obstacle_y_list]
 
-    obstacle_map, min_x, min_y, max_x, max_y, x_w, y_w = _calc_obstacle_map(obstacle_xs, obstacle_ys, resolution, rr)
+    obstacle_map, min_x, min_y, max_x, max_y, x_w, y_w = _calc_obstacle_map(
+        obstacle_x_list, obstacle_y_list, resolution, rr
+    )
 
     motion = _get_motion_model()
 
@@ -118,15 +120,15 @@ def _verify_node(node: Node, obstacle_map: list[list[bool]], min_x: int, min_y: 
 
 
 def _calc_obstacle_map(
-    obstacle_xs: list[float],
-    obstacle_ys: list[float],
+    obstacle_x_list: list[float],
+    obstacle_y_list: list[float],
     resolution: float,
     robot_radius: float,
 ) -> tuple[list[list[bool]], int, int, int, int, int, int]:
-    min_x = round(min(obstacle_xs))
-    min_y = round(min(obstacle_ys))
-    max_x = round(max(obstacle_xs))
-    max_y = round(max(obstacle_ys))
+    min_x = round(min(obstacle_x_list))
+    min_y = round(min(obstacle_y_list))
+    max_x = round(max(obstacle_x_list))
+    max_y = round(max(obstacle_y_list))
 
     x_width = round(max_x - min_x)
     y_width = round(max_y - min_y)
@@ -138,7 +140,7 @@ def _calc_obstacle_map(
         for iy in range(y_width):
             y = iy + min_y
             #  print(x, y)
-            for iox, ioy in zip(obstacle_xs, obstacle_ys):
+            for iox, ioy in zip(obstacle_x_list, obstacle_y_list):
                 d = math.hypot(iox - x, ioy - y)
                 if d <= robot_radius / resolution:
                     obstacle_map[ix][iy] = True
