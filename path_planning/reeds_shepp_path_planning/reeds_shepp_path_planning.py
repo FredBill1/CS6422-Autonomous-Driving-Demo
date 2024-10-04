@@ -9,6 +9,7 @@ co-author Videh Patel(@videh25) : Added the missing RS paths
 
 import math
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -20,10 +21,16 @@ from utils.angle import angle_mod
 show_animation = True
 
 
+class CourseSegmentType(StrEnum):
+    STRAIGHT = "S"
+    LEFT = "L"
+    RIGHT = "R"
+
+
 @dataclass
 class Path:
     lengths: list[float] = field(default_factory=list)  # course segment length (negative value is backward segment)
-    ctypes: list[str] = field(default_factory=list)  # course segment type char ("S": straight, "L": left, "R": right)
+    ctypes: list[CourseSegmentType] = field(default_factory=list)  # course segment type
     L: float = 0.0  # Total lengths of the path
     x: list[float] = field(default_factory=list)  # x positions
     y: list[float] = field(default_factory=list)  # y positions
@@ -54,7 +61,7 @@ def pi_2_pi(x: float) -> float:
     return angle_mod(x)
 
 
-def set_path(paths: list[Path], lengths: list[float], ctypes: list[str], step_size: float) -> list[Path]:
+def set_path(paths: list[Path], lengths: list[float], ctypes: list[CourseSegmentType], step_size: float) -> list[Path]:
     path = Path()
     path.ctypes = ctypes
     path.lengths = lengths
@@ -81,17 +88,17 @@ def polar(x: float, y: float) -> tuple[float, float]:
     return r, theta
 
 
-def left_straight_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_straight_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     u, t = polar(x - math.sin(phi), y - 1.0 + math.cos(phi))
     if 0.0 <= t <= math.pi:
         v = pi_2_pi(phi - t)
         if 0.0 <= v <= math.pi:
-            return True, [t, u, v], ["L", "S", "L"]
+            return True, [t, u, v], [CourseSegmentType.LEFT, CourseSegmentType.STRAIGHT, CourseSegmentType.LEFT]
 
     return False, [], []
 
 
-def left_straight_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_straight_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     u1, t1 = polar(x + math.sin(phi), y - 1.0 - math.cos(phi))
     u1 = u1**2
     if u1 >= 4.0:
@@ -101,12 +108,12 @@ def left_straight_right(x: float, y: float, phi: float) -> tuple[bool, list[floa
         v = pi_2_pi(t - phi)
 
         if (t >= 0.0) and (v >= 0.0):
-            return True, [t, u, v], ["L", "S", "R"]
+            return True, [t, u, v], [CourseSegmentType.LEFT, CourseSegmentType.STRAIGHT, CourseSegmentType.RIGHT]
 
     return False, [], []
 
 
-def left_x_right_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_x_right_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -116,12 +123,12 @@ def left_x_right_x_left(x: float, y: float, phi: float) -> tuple[bool, list[floa
         t = pi_2_pi(A + theta + math.pi / 2)
         u = pi_2_pi(math.pi - 2 * A)
         v = pi_2_pi(phi - t - u)
-        return True, [t, -u, v], ["L", "R", "L"]
+        return True, [t, -u, v], [CourseSegmentType.LEFT, CourseSegmentType.RIGHT, CourseSegmentType.LEFT]
 
     return False, [], []
 
 
-def left_x_right_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_x_right_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -131,12 +138,12 @@ def left_x_right_left(x: float, y: float, phi: float) -> tuple[bool, list[float]
         t = pi_2_pi(A + theta + math.pi / 2)
         u = pi_2_pi(math.pi - 2 * A)
         v = pi_2_pi(-phi + t + u)
-        return True, [t, -u, -v], ["L", "R", "L"]
+        return True, [t, -u, -v], [CourseSegmentType.LEFT, CourseSegmentType.RIGHT, CourseSegmentType.LEFT]
 
     return False, [], []
 
 
-def left_right_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_right_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -146,12 +153,12 @@ def left_right_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float]
         A = math.asin(2 * math.sin(u) / u1)
         t = pi_2_pi(-A + theta + math.pi / 2)
         v = pi_2_pi(t - u - phi)
-        return True, [t, u, -v], ["L", "R", "L"]
+        return True, [t, u, -v], [CourseSegmentType.LEFT, CourseSegmentType.RIGHT, CourseSegmentType.LEFT]
 
     return False, [], []
 
 
-def left_right_x_left_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_right_x_left_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -164,12 +171,16 @@ def left_right_x_left_right(x: float, y: float, phi: float) -> tuple[bool, list[
         u = pi_2_pi(A)
         v = pi_2_pi(phi - t + 2 * u)
         if (t >= 0) and (u >= 0) and (v >= 0):
-            return True, [t, u, -u, -v], ["L", "R", "L", "R"]
+            return (
+                True,
+                [t, u, -u, -v],
+                [CourseSegmentType.LEFT, CourseSegmentType.RIGHT, CourseSegmentType.LEFT, CourseSegmentType.RIGHT],
+            )
 
     return False, [], []
 
 
-def left_x_right_left_x_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_x_right_left_x_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -181,12 +192,16 @@ def left_x_right_left_x_right(x: float, y: float, phi: float) -> tuple[bool, lis
         t = pi_2_pi(theta + A + math.pi / 2)
         v = pi_2_pi(t - phi)
         if (t >= 0) and (v >= 0):
-            return True, [t, -u, -u, v], ["L", "R", "L", "R"]
+            return (
+                True,
+                [t, -u, -u, v],
+                [CourseSegmentType.LEFT, CourseSegmentType.RIGHT, CourseSegmentType.LEFT, CourseSegmentType.RIGHT],
+            )
 
     return False, [], []
 
 
-def left_x_right90_straight_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_x_right90_straight_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -197,12 +212,16 @@ def left_x_right90_straight_left(x: float, y: float, phi: float) -> tuple[bool, 
         t = pi_2_pi(theta + A + math.pi / 2)
         v = pi_2_pi(t - phi + math.pi / 2)
         if (t >= 0) and (v >= 0):
-            return True, [t, -math.pi / 2, -u, -v], ["L", "R", "S", "L"]
+            return (
+                True,
+                [t, -math.pi / 2, -u, -v],
+                [CourseSegmentType.LEFT, CourseSegmentType.RIGHT, CourseSegmentType.STRAIGHT, CourseSegmentType.LEFT],
+            )
 
     return False, [], []
 
 
-def left_straight_right90_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_straight_right90_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -213,12 +232,16 @@ def left_straight_right90_x_left(x: float, y: float, phi: float) -> tuple[bool, 
         t = pi_2_pi(theta - A + math.pi / 2)
         v = pi_2_pi(t - phi - math.pi / 2)
         if (t >= 0) and (v >= 0):
-            return True, [t, u, math.pi / 2, -v], ["L", "S", "R", "L"]
+            return (
+                True,
+                [t, u, math.pi / 2, -v],
+                [CourseSegmentType.LEFT, CourseSegmentType.STRAIGHT, CourseSegmentType.RIGHT, CourseSegmentType.LEFT],
+            )
 
     return False, [], []
 
 
-def left_x_right90_straight_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_x_right90_straight_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -228,12 +251,16 @@ def left_x_right90_straight_right(x: float, y: float, phi: float) -> tuple[bool,
         u = u1 - 2
         v = pi_2_pi(phi - t - math.pi / 2)
         if (t >= 0) and (v >= 0):
-            return True, [t, -math.pi / 2, -u, -v], ["L", "R", "S", "R"]
+            return (
+                True,
+                [t, -math.pi / 2, -u, -v],
+                [CourseSegmentType.LEFT, CourseSegmentType.RIGHT, CourseSegmentType.STRAIGHT, CourseSegmentType.RIGHT],
+            )
 
     return False, [], []
 
 
-def left_straight_left90_x_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_straight_left90_x_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -243,12 +270,18 @@ def left_straight_left90_x_right(x: float, y: float, phi: float) -> tuple[bool, 
         u = u1 - 2
         v = pi_2_pi(phi - t - math.pi / 2)
         if (t >= 0) and (v >= 0):
-            return True, [t, u, math.pi / 2, -v], ["L", "S", "L", "R"]
+            return (
+                True,
+                [t, u, math.pi / 2, -v],
+                [CourseSegmentType.LEFT, CourseSegmentType.STRAIGHT, CourseSegmentType.LEFT, CourseSegmentType.RIGHT],
+            )
 
     return False, [], []
 
 
-def left_x_right90_straight_left90_x_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
+def left_x_right90_straight_left90_x_right(
+    x: float, y: float, phi: float
+) -> tuple[bool, list[float], list[CourseSegmentType]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -259,7 +292,17 @@ def left_x_right90_straight_left90_x_right(x: float, y: float, phi: float) -> tu
         t = pi_2_pi(theta + A + math.pi / 2)
         v = pi_2_pi(t - phi)
         if (t >= 0) and (v >= 0):
-            return True, [t, -math.pi / 2, -u, -math.pi / 2, v], ["L", "R", "S", "L", "R"]
+            return (
+                True,
+                [t, -math.pi / 2, -u, -math.pi / 2, v],
+                [
+                    CourseSegmentType.LEFT,
+                    CourseSegmentType.RIGHT,
+                    CourseSegmentType.STRAIGHT,
+                    CourseSegmentType.LEFT,
+                    CourseSegmentType.RIGHT,
+                ],
+            )
 
     return False, [], []
 
@@ -268,16 +311,13 @@ def timeflip(travel_distances: list[float]) -> list[float]:
     return [-x for x in travel_distances]
 
 
-def reflect(steering_directions: list[str]) -> list[str]:
-    def switch_dir(dirn):
-        if dirn == "L":
-            return "R"
-        elif dirn == "R":
-            return "L"
-        else:
-            return "S"
-
-    return [switch_dir(dirn) for dirn in steering_directions]
+def reflect(steering_directions: list[CourseSegmentType]) -> list[CourseSegmentType]:
+    d = {
+        CourseSegmentType.LEFT: CourseSegmentType.RIGHT,
+        CourseSegmentType.RIGHT: CourseSegmentType.LEFT,
+        CourseSegmentType.STRAIGHT: CourseSegmentType.STRAIGHT,
+    }
+    return [d[dirn] for dirn in steering_directions]
 
 
 def generate_path(
@@ -360,7 +400,7 @@ def calc_interpolate_dists_list(lengths: list[float], step_size: float) -> list[
 
 
 def generate_local_course(
-    lengths: list[float], ctypes: list[str], max_curvature: float, step_size: float
+    lengths: list[float], ctypes: list[CourseSegmentType], max_curvature: float, step_size: float
 ) -> tuple[list[float], list[float], list[float], list[int]]:
     interpolate_dists_list = calc_interpolate_dists_list(lengths, step_size * max_curvature)
 
@@ -383,9 +423,9 @@ def generate_local_course(
 
 
 def interpolate(
-    dist: float, length: float, ctype: str, max_curvature: float, origin_x: float, origin_y: float, origin_yaw: float
+    dist: float, length: float, ctype: CourseSegmentType, max_curvature: float, origin_x: float, origin_y: float, origin_yaw: float
 ) -> tuple[float, float, float, int]:
-    if ctype == "S":
+    if ctype == CourseSegmentType.STRAIGHT:
         x = origin_x + dist / max_curvature * math.cos(origin_yaw)
         y = origin_y + dist / max_curvature * math.sin(origin_yaw)
         yaw = origin_yaw
@@ -393,10 +433,10 @@ def interpolate(
         ldx = math.sin(dist) / max_curvature
         ldy = 0.0
         yaw = None
-        if ctype == "L":  # left turn
+        if ctype == CourseSegmentType.LEFT:  # left turn
             ldy = (1.0 - math.cos(dist)) / max_curvature
             yaw = origin_yaw + dist
-        elif ctype == "R":  # right turn
+        elif ctype == CourseSegmentType.RIGHT:  # right turn
             ldy = (1.0 - math.cos(dist)) / -max_curvature
             yaw = origin_yaw - dist
         gdx = math.cos(-origin_yaw) * ldx + math.sin(-origin_yaw) * ldy
