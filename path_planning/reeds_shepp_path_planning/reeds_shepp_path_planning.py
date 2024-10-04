@@ -8,6 +8,7 @@ co-author Videh Patel(@videh25) : Added the missing RS paths
 """
 
 import math
+from dataclasses import dataclass, field
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,21 +18,15 @@ from utils.angle import angle_mod
 show_animation = True
 
 
+@dataclass
 class Path:
-    """
-    Path data container
-    """
-
-    def __init__(self):
-        # course segment length  (negative value is backward segment)
-        self.lengths = []
-        # course segment type char ("S": straight, "L": left, "R": right)
-        self.ctypes = []
-        self.L = 0.0  # Total lengths of the path
-        self.x = []  # x positions
-        self.y = []  # y positions
-        self.yaw = []  # orientations [rad]
-        self.directions = []  # directions (1:forward, -1:backward)
+    lengths: list[float] = field(default_factory=list)  # course segment length (negative value is backward segment)
+    ctypes: list[str] = field(default_factory=list)  # course segment type char ("S": straight, "L": left, "R": right)
+    L: float = 0.0  # Total lengths of the path
+    x: list[float] = field(default_factory=list)  # x positions
+    y: list[float] = field(default_factory=list)  # y positions
+    yaw: list[float] = field(default_factory=list)  # orientations [rad]
+    directions: list[int] = field(default_factory=list)  # directions (1:forward, -1:backward)
 
 
 def plot_arrow(x, y, yaw, length=1.0, width=0.5, fc="r", ec="k"):
