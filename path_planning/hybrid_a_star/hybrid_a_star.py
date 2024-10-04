@@ -60,7 +60,9 @@ class Path:
 
 
 class Config:
-    def __init__(self, obstacle_xs: list[float], obstacle_ys: list[float], xy_resolution: float, yaw_resolution: float) -> None:
+    def __init__(
+        self, obstacle_xs: list[float], obstacle_ys: list[float], xy_resolution: float, yaw_resolution: float
+    ) -> None:
         min_x_m = min(obstacle_xs)
         min_y_m = min(obstacle_ys)
         max_x_m = max(obstacle_xs)
@@ -143,12 +145,26 @@ def calc_next_node(
 
     cost = current.cost + added_cost + arc_l
 
-    node = Node(x_ind, y_ind, yaw_ind, d, x_list, y_list, yaw_list, [d], parent_index=calc_index(current, config), cost=cost, steer=steer)
+    node = Node(
+        x_ind,
+        y_ind,
+        yaw_ind,
+        d,
+        x_list,
+        y_list,
+        yaw_list,
+        [d],
+        parent_index=calc_index(current, config),
+        cost=cost,
+        steer=steer,
+    )
 
     return node
 
 
-def analytic_expansion(current: Node, goal: Node, obstacle_xs: list[float], obstacle_ys: list[float], kd_tree: cKDTree) -> rs.Path:
+def analytic_expansion(
+    current: Node, goal: Node, obstacle_xs: list[float], obstacle_ys: list[float], kd_tree: cKDTree
+) -> rs.Path:
     start_x = current.x_list[-1]
     start_y = current.y_list[-1]
     start_yaw = current.yaw_list[-1]
@@ -158,7 +174,9 @@ def analytic_expansion(current: Node, goal: Node, obstacle_xs: list[float], obst
     goal_yaw = goal.yaw_list[-1]
 
     max_curvature = math.tan(MAX_STEER) / WB
-    paths = rs.calc_paths(start_x, start_y, start_yaw, goal_x, goal_y, goal_yaw, max_curvature, step_size=MOTION_RESOLUTION)
+    paths = rs.calc_paths(
+        start_x, start_y, start_yaw, goal_x, goal_y, goal_yaw, max_curvature, step_size=MOTION_RESOLUTION
+    )
 
     if not paths:
         return None
@@ -284,12 +302,21 @@ def hybrid_a_star_planning(
         cost=0,
     )
     goal_node = Node(
-        round(goal[0] / xy_resolution), round(goal[1] / xy_resolution), round(goal[2] / yaw_resolution), True, [goal[0]], [goal[1]], [goal[2]], [True]
+        round(goal[0] / xy_resolution),
+        round(goal[1] / xy_resolution),
+        round(goal[2] / yaw_resolution),
+        True,
+        [goal[0]],
+        [goal[1]],
+        [goal[2]],
+        [True],
     )
 
     openList: dict[int, Node] = {}
     closedList: dict[int, Node] = {}
-    h_dp = calc_distance_heuristic(goal_node.x_list[-1], goal_node.y_list[-1], obstacle_xs, obstacle_ys, xy_resolution, BUBBLE_R)
+    h_dp = calc_distance_heuristic(
+        goal_node.x_list[-1], goal_node.y_list[-1], obstacle_xs, obstacle_ys, xy_resolution, BUBBLE_R
+    )
 
     pq: list[tuple[float, int]] = []
     openList[calc_index(start_node, config)] = start_node
@@ -311,11 +338,15 @@ def hybrid_a_star_planning(
         if show_animation:  # pragma: no cover
             plt.plot(current.x_list[-1], current.y_list[-1], "xc")
             # for stopping simulation with the esc key.
-            plt.gcf().canvas.mpl_connect("key_release_event", lambda event: [exit(0) if event.key == "escape" else None])
+            plt.gcf().canvas.mpl_connect(
+                "key_release_event", lambda event: [exit(0) if event.key == "escape" else None]
+            )
             if len(closedList.keys()) % 10 == 0:
                 plt.pause(0.001)
 
-        is_updated, final_path = update_node_with_analytic_expansion(current, goal_node, config, obstacle_xs, obstacle_ys, obstacle_kd_tree)
+        is_updated, final_path = update_node_with_analytic_expansion(
+            current, goal_node, config, obstacle_xs, obstacle_ys, obstacle_kd_tree
+        )
 
         if is_updated:
             print("path found")
@@ -341,7 +372,11 @@ def calc_cost(node: Node, h_dp: dict[int, DPNode], config: Config) -> float:
 
 
 def get_final_path(closed: dict[int, Node], goal_node: Node) -> Path:
-    reversed_x, reversed_y, reversed_yaw = list(reversed(goal_node.x_list)), list(reversed(goal_node.y_list)), list(reversed(goal_node.yaw_list))
+    reversed_x, reversed_y, reversed_yaw = (
+        list(reversed(goal_node.x_list)),
+        list(reversed(goal_node.y_list)),
+        list(reversed(goal_node.yaw_list)),
+    )
     direction = list(reversed(goal_node.directions))
     nid = goal_node.parent_index
     final_cost = goal_node.cost
@@ -377,7 +412,11 @@ def verify_index(node: Node, config: Config) -> bool:
 
 
 def calc_index(node: Node, config: Config) -> int:
-    ind = (node.yaw_index - config.min_yaw) * config.x_w * config.y_w + (node.y_index - config.min_y) * config.x_w + (node.x_index - config.min_x)
+    ind = (
+        (node.yaw_index - config.min_yaw) * config.x_w * config.y_w
+        + (node.y_index - config.min_y) * config.x_w
+        + (node.x_index - config.min_x)
+    )
 
     if ind <= 0:
         print("Error(calc_index):", ind)

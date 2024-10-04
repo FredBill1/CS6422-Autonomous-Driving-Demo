@@ -105,7 +105,16 @@ def plot_arrow(x, y, yaw, arrow_length=1.0, origin_point_plot_style="xr", head_w
         for i_x, i_y, i_yaw in zip(x, y, yaw):
             plot_arrow(i_x, i_y, i_yaw, head_width=head_width, fc=fc, ec=ec, **kwargs)
     else:
-        plt.arrow(x, y, arrow_length * math.cos(yaw), arrow_length * math.sin(yaw), head_width=head_width, fc=fc, ec=ec, **kwargs)
+        plt.arrow(
+            x,
+            y,
+            arrow_length * math.cos(yaw),
+            arrow_length * math.sin(yaw),
+            head_width=head_width,
+            fc=fc,
+            ec=ec,
+            **kwargs
+        )
         if origin_point_plot_style is not None:
             plt.plot(x, y, origin_point_plot_style)
 
@@ -208,7 +217,9 @@ def set_equal_3d_axis(ax, x_lims, y_lims, z_lims):
     y_lims = np.asarray(y_lims)
     z_lims = np.asarray(z_lims)
     # compute max required range
-    max_range = np.array([x_lims.max() - x_lims.min(), y_lims.max() - y_lims.min(), z_lims.max() - z_lims.min()]).max() / 2.0
+    max_range = (
+        np.array([x_lims.max() - x_lims.min(), y_lims.max() - y_lims.min(), z_lims.max() - z_lims.min()]).max() / 2.0
+    )
     # compute mid-point along each axis
     mid_x = (x_lims.max() + x_lims.min()) * 0.5
     mid_y = (y_lims.max() + y_lims.min()) * 0.5

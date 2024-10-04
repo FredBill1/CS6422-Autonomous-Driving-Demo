@@ -81,7 +81,9 @@ def plot_arrow(
         for i_x, i_y, i_yaw in zip(x, y, yaw):
             plot_arrow(i_x, i_y, i_yaw)
     else:
-        plt.arrow(x, y, length * cos(yaw), length * sin(yaw), fc=fc, ec=ec, head_width=width, head_length=width, alpha=0.4)
+        plt.arrow(
+            x, y, length * cos(yaw), length * sin(yaw), fc=fc, ec=ec, head_width=width, head_length=width, alpha=0.4
+        )
 
 
 def plot_car(x: float, y: float, yaw: float) -> None:

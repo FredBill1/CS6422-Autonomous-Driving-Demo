@@ -30,7 +30,11 @@ def main():
     plt.subplots(1)
     plt.plot(x, y, "xb", label="Data points")
 
-    for kind, label in [("linear", "C0 (Linear spline)"), ("quadratic", "C0 & C1 (Quadratic spline)"), ("cubic", "C0 & C1 & C2 (Cubic spline)")]:
+    for kind, label in [
+        ("linear", "C0 (Linear spline)"),
+        ("quadratic", "C0 & C1 (Quadratic spline)"),
+        ("cubic", "C0 & C1 & C2 (Cubic spline)"),
+    ]:
         rx, ry = [], []
         sp = Spline2D(x, y, kind=kind)
         s = np.arange(0, sp.s[-1], ds)

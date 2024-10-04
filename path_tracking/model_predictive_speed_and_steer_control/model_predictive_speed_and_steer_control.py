@@ -112,7 +112,13 @@ def plot_car(x, y, yaw, steer=0.0, cabcolor="-r", truckcolor="-k"):  # pragma: n
     fr_wheel = np.array(
         [
             [WHEEL_LEN, -WHEEL_LEN, -WHEEL_LEN, WHEEL_LEN, WHEEL_LEN],
-            [-WHEEL_WIDTH - TREAD, -WHEEL_WIDTH - TREAD, WHEEL_WIDTH - TREAD, WHEEL_WIDTH - TREAD, -WHEEL_WIDTH - TREAD],
+            [
+                -WHEEL_WIDTH - TREAD,
+                -WHEEL_WIDTH - TREAD,
+                WHEEL_WIDTH - TREAD,
+                WHEEL_WIDTH - TREAD,
+                -WHEEL_WIDTH - TREAD,
+            ],
         ]
     )
 
@@ -394,7 +400,9 @@ def do_simulation(course_xs, course_ys, course_yaws, speed_profile, course_tick,
     course_yaws = smooth_yaw(course_yaws)
 
     while MAX_TIME >= time:
-        xref, target_ind, dref = calc_ref_trajectory(state, course_xs, course_ys, course_yaws, speed_profile, course_tick, target_ind)
+        xref, target_ind, dref = calc_ref_trajectory(
+            state, course_xs, course_ys, course_yaws, speed_profile, course_tick, target_ind
+        )
 
         x0 = [state.x, state.y, state.v, state.yaw]  # current state
 
@@ -422,7 +430,9 @@ def do_simulation(course_xs, course_ys, course_yaws, speed_profile, course_tick,
         if show_animation:  # pragma: no cover
             plt.cla()
             # for stopping simulation with the esc key.
-            plt.gcf().canvas.mpl_connect("key_release_event", lambda event: [exit(0) if event.key == "escape" else None])
+            plt.gcf().canvas.mpl_connect(
+                "key_release_event", lambda event: [exit(0) if event.key == "escape" else None]
+            )
             if ox is not None:
                 plt.plot(ox, oy, "xr", label="MPC")
             plt.plot(course_xs, course_ys, "-r", label="course")

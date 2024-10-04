@@ -70,7 +70,9 @@ def calc_distance_heuristic(
         if show_animation:  # pragma: no cover
             plt.plot(current.x * resolution, current.y * resolution, "xc")
             # for stopping simulation with the esc key.
-            plt.gcf().canvas.mpl_connect("key_release_event", lambda event: [exit(0) if event.key == "escape" else None])
+            plt.gcf().canvas.mpl_connect(
+                "key_release_event", lambda event: [exit(0) if event.key == "escape" else None]
+            )
             if len(closed_set.keys()) % 10 == 0:
                 plt.pause(0.1)
 
