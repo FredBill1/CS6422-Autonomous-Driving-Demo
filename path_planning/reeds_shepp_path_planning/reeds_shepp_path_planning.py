@@ -42,7 +42,7 @@ def pi_2_pi(x: float) -> float:
     return angle_mod(x)
 
 
-def set_path(paths, lengths, ctypes, step_size):
+def set_path(paths: list[Path], lengths: list[float], ctypes: list[str], step_size: float) -> list[Path]:
     path = Path()
     path.ctypes = ctypes
     path.lengths = lengths
@@ -63,13 +63,13 @@ def set_path(paths, lengths, ctypes, step_size):
     return paths
 
 
-def polar(x, y):
+def polar(x: float, y: float) -> tuple[float, float]:
     r = math.hypot(x, y)
     theta = math.atan2(y, x)
     return r, theta
 
 
-def left_straight_left(x, y, phi):
+def left_straight_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     u, t = polar(x - math.sin(phi), y - 1.0 + math.cos(phi))
     if 0.0 <= t <= math.pi:
         v = pi_2_pi(phi - t)
@@ -79,7 +79,7 @@ def left_straight_left(x, y, phi):
     return False, [], []
 
 
-def left_straight_right(x, y, phi):
+def left_straight_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     u1, t1 = polar(x + math.sin(phi), y - 1.0 - math.cos(phi))
     u1 = u1**2
     if u1 >= 4.0:
@@ -94,7 +94,7 @@ def left_straight_right(x, y, phi):
     return False, [], []
 
 
-def left_x_right_x_left(x, y, phi):
+def left_x_right_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -109,7 +109,7 @@ def left_x_right_x_left(x, y, phi):
     return False, [], []
 
 
-def left_x_right_left(x, y, phi):
+def left_x_right_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -124,7 +124,7 @@ def left_x_right_left(x, y, phi):
     return False, [], []
 
 
-def left_right_x_left(x, y, phi):
+def left_right_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -139,7 +139,7 @@ def left_right_x_left(x, y, phi):
     return False, [], []
 
 
-def left_right_x_left_right(x, y, phi):
+def left_right_x_left_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -157,7 +157,7 @@ def left_right_x_left_right(x, y, phi):
     return False, [], []
 
 
-def left_x_right_left_x_right(x, y, phi):
+def left_x_right_left_x_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -174,7 +174,7 @@ def left_x_right_left_x_right(x, y, phi):
     return False, [], []
 
 
-def left_x_right90_straight_left(x, y, phi):
+def left_x_right90_straight_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -190,7 +190,7 @@ def left_x_right90_straight_left(x, y, phi):
     return False, [], []
 
 
-def left_straight_right90_x_left(x, y, phi):
+def left_straight_right90_x_left(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x - math.sin(phi)
     eeta = y - 1 + math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -206,7 +206,7 @@ def left_straight_right90_x_left(x, y, phi):
     return False, [], []
 
 
-def left_x_right90_straight_right(x, y, phi):
+def left_x_right90_straight_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -221,7 +221,7 @@ def left_x_right90_straight_right(x, y, phi):
     return False, [], []
 
 
-def left_straight_left90_x_right(x, y, phi):
+def left_straight_left90_x_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -236,7 +236,7 @@ def left_straight_left90_x_right(x, y, phi):
     return False, [], []
 
 
-def left_x_right90_straight_left90_x_right(x, y, phi):
+def left_x_right90_straight_left90_x_right(x: float, y: float, phi: float) -> tuple[bool, list[float], list[str]]:
     zeta = x + math.sin(phi)
     eeta = y - 1 - math.cos(phi)
     u1, theta = polar(zeta, eeta)
@@ -252,11 +252,11 @@ def left_x_right90_straight_left90_x_right(x, y, phi):
     return False, [], []
 
 
-def timeflip(travel_distances):
+def timeflip(travel_distances: list[float]) -> list[float]:
     return [-x for x in travel_distances]
 
 
-def reflect(steering_directions):
+def reflect(steering_directions: list[str]) -> list[str]:
     def switch_dir(dirn):
         if dirn == "L":
             return "R"
