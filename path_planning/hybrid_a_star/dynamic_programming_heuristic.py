@@ -10,21 +10,19 @@ See Wikipedia article (https://en.wikipedia.org/wiki/A*_search_algorithm)
 
 import heapq
 import math
+from dataclasses import dataclass
 
 import matplotlib.pyplot as plt
 
 show_animation = False
 
 
+@dataclass
 class Node:
-    def __init__(self, x: int, y: int, cost: float, parent_index: int) -> None:
-        self.x = x
-        self.y = y
-        self.cost = cost
-        self.parent_index = parent_index
-
-    def __str__(self):
-        return str(self.x) + "," + str(self.y) + "," + str(self.cost) + "," + str(self.parent_index)
+    x: int
+    y: int
+    cost: float
+    parent_index: int
 
 
 def calc_distance_heuristic(

@@ -9,6 +9,7 @@ author: Zheng Zh (@Zhengzh)
 import heapq
 import math
 from collections.abc import Generator
+from dataclasses import dataclass
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -34,42 +35,28 @@ H_COST = 5.0  # Heuristic cost
 show_animation = True
 
 
+@dataclass
 class Node:
-
-    def __init__(
-        self,
-        x_ind: int,
-        y_ind: int,
-        yaw_ind: int,
-        direction: int,
-        x_list: list[float],
-        y_list: list[float],
-        yaw_list: list[float],
-        directions: list[bool],
-        steer: float = 0.0,
-        parent_index: Optional[int] = None,
-        cost: Optional[float] = None,
-    ) -> None:
-        self.x_index = x_ind
-        self.y_index = y_ind
-        self.yaw_index = yaw_ind
-        self.direction = direction
-        self.x_list = x_list
-        self.y_list = y_list
-        self.yaw_list = yaw_list
-        self.directions = directions
-        self.steer = steer
-        self.parent_index = parent_index
-        self.cost = cost
+    x_index: int
+    y_index: int
+    yaw_index: int
+    direction: int
+    x_list: list[float]
+    y_list: list[float]
+    yaw_list: list[float]
+    directions: list[bool]
+    steer: float = 0.0
+    parent_index: Optional[int] = None
+    cost: Optional[float] = None
 
 
+@dataclass
 class Path:
-    def __init__(self, x_list: list[float], y_list: list[float], yaw_list: list[float], direction_list: list[bool], cost: float) -> None:
-        self.x_list = x_list
-        self.y_list = y_list
-        self.yaw_list = yaw_list
-        self.direction_list = direction_list
-        self.cost = cost
+    x_list: list[float]
+    y_list: list[float]
+    yaw_list: list[float]
+    direction_list: list[bool]
+    cost: float
 
 
 class Config:
