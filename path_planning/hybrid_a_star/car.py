@@ -6,10 +6,12 @@ author: Zheng Zh (@Zhengzh)
 
 """
 
+from collections.abc import Iterable
 from math import cos, pi, sin, tan
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.spatial import cKDTree
 
 from utils.angle import rot_mat_2d
 
@@ -27,7 +29,14 @@ VRX = [LF, LF, -LB, -LB, LF]
 VRY = [W / 2, -W / 2, -W / 2, W / 2, W / 2]
 
 
-def check_car_collision(x_list, y_list, yaw_list, ox, oy, kd_tree):
+def check_car_collision(
+    x_list: list[float],
+    y_list: list[float],
+    yaw_list: list[float],
+    obstacle_xs: list[float],
+    obstacle_ys: list[float],
+    kd_tree: cKDTree,
+) -> bool:
     for i_x, i_y, i_yaw in zip(x_list, y_list, yaw_list):
         cx = i_x + BUBBLE_DIST * cos(i_yaw)
         cy = i_y + BUBBLE_DIST * sin(i_yaw)
@@ -37,16 +46,16 @@ def check_car_collision(x_list, y_list, yaw_list, ox, oy, kd_tree):
         if not ids:
             continue
 
-        if not rectangle_check(i_x, i_y, i_yaw, [ox[i] for i in ids], [oy[i] for i in ids]):
+        if not rectangle_check(i_x, i_y, i_yaw, [obstacle_xs[i] for i in ids], [obstacle_ys[i] for i in ids]):
             return False  # collision
 
     return True  # no collision
 
 
-def rectangle_check(x, y, yaw, ox, oy):
+def rectangle_check(x: float, y: float, yaw: float, obstacle_xs: list[float], obstacle_ys: list[float]) -> bool:
     # transform obstacles to base link frame
     rot = rot_mat_2d(yaw)
-    for iox, ioy in zip(ox, oy):
+    for iox, ioy in zip(obstacle_xs, obstacle_ys):
         tx = iox - x
         ty = ioy - y
         converted_xy = np.stack([tx, ty]).T @ rot
@@ -58,7 +67,15 @@ def rectangle_check(x, y, yaw, ox, oy):
     return True  # no collision
 
 
-def plot_arrow(x, y, yaw, length=1.0, width=0.5, fc="r", ec="k"):
+def plot_arrow(
+    x: float | Iterable[float],
+    y: float | Iterable[float],
+    yaw: float | Iterable[float],
+    length: float = 1.0,
+    width: float = 0.5,
+    fc="r",
+    ec="k",
+) -> None:
     """Plot arrow."""
     if not isinstance(x, float):
         for i_x, i_y, i_yaw in zip(x, y, yaw):
@@ -67,7 +84,7 @@ def plot_arrow(x, y, yaw, length=1.0, width=0.5, fc="r", ec="k"):
         plt.arrow(x, y, length * cos(yaw), length * sin(yaw), fc=fc, ec=ec, head_width=width, head_length=width, alpha=0.4)
 
 
-def plot_car(x, y, yaw):
+def plot_car(x: float, y: float, yaw: float) -> None:
     car_color = "-k"
     c, s = cos(yaw), sin(yaw)
     rot = rot_mat_2d(-yaw)
@@ -83,11 +100,11 @@ def plot_car(x, y, yaw):
     plt.plot(car_outline_x, car_outline_y, car_color)
 
 
-def pi_2_pi(angle):
+def pi_2_pi(angle: float) -> float:
     return (angle + pi) % (2 * pi) - pi
 
 
-def move(x, y, yaw, distance, steer, L=WB):
+def move(x: float, y: float, yaw: float, distance: float, steer: float, L: float = WB) -> tuple[float, float, float]:
     x += distance * cos(yaw)
     y += distance * sin(yaw)
     yaw += pi_2_pi(distance * tan(steer) / L)  # distance/2
