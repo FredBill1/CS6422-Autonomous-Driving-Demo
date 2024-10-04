@@ -347,7 +347,7 @@ def hybrid_a_star_planning(
                 "key_release_event", lambda event: [exit(0) if event.key == "escape" else None]
             )
             if len(closedList.keys()) % 10 == 0:
-                plt.pause(0.001)
+                plt.pause(0.1)
 
         is_updated, final_path = update_node_with_analytic_expansion(
             current, goal_node, config, obstacle_x_list, obstacle_y_list, obstacle_kd_tree
