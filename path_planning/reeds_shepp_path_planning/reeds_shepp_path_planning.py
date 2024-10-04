@@ -393,7 +393,9 @@ def generate_local_course(
     for interp_dists, course_segment_type, length in zip(interpolate_dists_list, course_segment_types, lengths):
 
         for dist in interp_dists:
-            x, y, yaw, direction = interpolate(dist, length, course_segment_type, max_curvature, origin_x, origin_y, origin_yaw)
+            x, y, yaw, direction = interpolate(
+                dist, length, course_segment_type, max_curvature, origin_x, origin_y, origin_yaw
+            )
             xs.append(x)
             ys.append(y)
             yaws.append(yaw)
@@ -475,7 +477,7 @@ def reeds_shepp_path_planning(
     goal_yaw: float,
     max_curvature: float,
     step_size: float = 0.2,
-):
+) -> tuple[list[float], list[float], list[float], list[CourseSegmentType], list[float]]:
     paths = calc_paths(start_x, start_y, start_yaw, goal_x, goal_y, goal_yaw, max_curvature, step_size)
     if not paths:
         return None, None, None, None, None  # could not generate any path
