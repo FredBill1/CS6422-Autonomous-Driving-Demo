@@ -14,7 +14,7 @@ from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 
 from ..reeds_shepp_path_planning import reeds_shepp_path_planning as rs
 from .car import BUBBLE_R, MAX_STEER, WB, check_car_collision, move, plot_car
@@ -97,7 +97,7 @@ def get_neighbors(
     config: Config,
     obstacle_x_list: list[float],
     obstacle_y_list: list[float],
-    kd_tree: cKDTree,
+    kd_tree: KDTree,
 ) -> Generator[Node, None, None]:
     for steer, d in calc_motion_inputs():
         node = calc_next_node(current, steer, d, config, obstacle_x_list, obstacle_y_list, kd_tree)
@@ -112,7 +112,7 @@ def calc_next_node(
     config: Config,
     obstacle_x_list: list[float],
     obstacle_y_list: list[float],
-    kd_tree: cKDTree,
+    kd_tree: KDTree,
 ) -> Node:
     x, y, yaw = current.x_list[-1], current.y_list[-1], current.yaw_list[-1]
 
@@ -163,7 +163,7 @@ def calc_next_node(
 
 
 def analytic_expansion(
-    current: Node, goal: Node, obstacle_x_list: list[float], obstacle_y_list: list[float], kd_tree: cKDTree
+    current: Node, goal: Node, obstacle_x_list: list[float], obstacle_y_list: list[float], kd_tree: KDTree
 ) -> rs.Path:
     start_x = current.x_list[-1]
     start_y = current.y_list[-1]
@@ -199,7 +199,7 @@ def update_node_with_analytic_expansion(
     config: Config,
     obstacle_x_list: list[float],
     obstacle_y_list: list[float],
-    kd_tree: cKDTree,
+    kd_tree: KDTree,
 ) -> tuple[bool, Optional[Node]]:
     path = analytic_expansion(current, goal, obstacle_x_list, obstacle_y_list, kd_tree)
 
@@ -291,7 +291,7 @@ def hybrid_a_star_planning(
     start[2], goal[2] = rs.pi_2_pi(start[2]), rs.pi_2_pi(goal[2])
     tmp_obstacle_x_list, tmp_obstacle_y_list = obstacle_x_list[:], obstacle_y_list[:]
 
-    obstacle_kd_tree = cKDTree(np.vstack((tmp_obstacle_x_list, tmp_obstacle_y_list)).T)
+    obstacle_kd_tree = KDTree(np.vstack((tmp_obstacle_x_list, tmp_obstacle_y_list)).T)
 
     config = Config(tmp_obstacle_x_list, tmp_obstacle_y_list, xy_resolution, yaw_resolution)
 

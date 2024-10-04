@@ -11,7 +11,7 @@ from math import cos, pi, sin, tan
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 
 from utils.angle import rot_mat_2d
 
@@ -35,7 +35,7 @@ def check_car_collision(
     yaw_list: list[float],
     obstacle_x_list: list[float],
     obstacle_y_list: list[float],
-    kd_tree: cKDTree,
+    kd_tree: KDTree,
 ) -> bool:
     for i_x, i_y, i_yaw in zip(x_list, y_list, yaw_list):
         cx = i_x + BUBBLE_DIST * cos(i_yaw)
