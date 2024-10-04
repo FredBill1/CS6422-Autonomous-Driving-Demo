@@ -55,7 +55,7 @@ def calc_distance_heuristic(
     open_set: dict[int, Node] = {}
     closed_set: dict[int, Node] = {}
     open_set[_calc_index(goal_node, x_w, min_x, min_y)] = goal_node
-    priority_queue = [(0, _calc_index(goal_node, x_w, min_x, min_y))]
+    priority_queue: list[tuple[float, int]] = [(0.0, _calc_index(goal_node, x_w, min_x, min_y))]
 
     while True:
         if not priority_queue:
