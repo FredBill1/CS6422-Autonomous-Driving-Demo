@@ -1,0 +1,163 @@
+import heapq
+from collections.abc import Generator
+from itertools import product
+from typing import Any, Literal, NamedTuple, Optional
+
+import numpy as np
+import numpy.typing as npt
+from rsplan import Path as RSPath
+from rsplan.planner import _solve_path as solve_rspath
+
+from modeling.Car import Car
+from modeling.Obstacles import ObstacleGrid, Obstacles
+from utils.wrap_angle import wrap_angle
+
+XY_GRID_RESOLUTION = 2.0  # [m]
+YAW_GRID_RESOLUTION = np.deg2rad(15.0)  # [rad]
+MOTION_RESOLUTION = 0.1  # [m] path interpolate resolution
+MOTION_DISTANCE = XY_GRID_RESOLUTION * 1.5  # [m] path interpolate distance
+NUM_STEER_COMMANDS = 20  # number of steer command
+
+SWITCH_DIRECTION_COST = 100.0  # switch direction cost
+BACKWARDS_COST = 5.0  # backward penalty cost
+STEER_CHANGE_COST = 3.0  # steer angle change cost
+STEER_COST = 3.0  # steer angle cost
+H_COST = 7.0  # Heuristic cost
+
+
+STEER_COMMANDS = np.unique(np.concatenate([np.linspace(-Car.MAX_STEER, Car.MAX_STEER, NUM_STEER_COMMANDS), [0.0]]))
+
+
+MOVEMENTS = tuple((di, dj, np.sqrt(di**2 + dj**2)) for di in (-1, 0, 1) for dj in (-1, 0, 1) if di or dj)
+
+
+def _distance_heuristic(grid: ObstacleGrid, goal_xy: npt.ArrayLike) -> ObstacleGrid:
+    H, W = grid.grid.shape
+    dist = np.full((H, W), np.inf)
+    ij = grid.calc_index(goal_xy)
+    dist[ij] = 0
+    pq = [(0, ij)]
+    while pq:
+        d, (i, j) = heapq.heappop(pq)
+        if d > dist[i, j]:
+            continue
+        for di, dj, cost in MOVEMENTS:
+            ni, nj = i + di, j + dj
+            if 0 <= ni < H and 0 <= nj < W and not grid.grid[ni, nj] and d + cost < dist[ni, nj]:
+                dist[ni, nj] = d + cost
+                heapq.heappush(pq, (d + cost, (ni, nj)))
+    return ObstacleGrid(grid.minx, grid.maxx, grid.miny, grid.maxy, grid.resolution, dist)
+
+
+class _Node(NamedTuple):
+    ijk: tuple[int, int, int]  # grid index
+    trajectory: npt.NDArray[np.floating[Any]]  # [[x(m), y(m), yaw(rad)]]
+    direction: Literal[1, -1]  # direction, 1 forward, -1 backward]
+    steer: float  # [rad], [-MAX_STEER, MAX_STEER]
+    cost: float
+    h_cost: float
+    parent: Optional["_Node"]
+
+    def __lt__(self, other: "_Node") -> bool:
+        return (self.h_cost + self.cost, self.cost) < (other.h_cost + other.cost, other.cost)
+
+
+def hybrid_a_star(
+    start: npt.NDArray[np.floating[Any]], goal: npt.NDArray[np.floating[Any]], obstacles: Obstacles
+) -> Optional[npt.NDArray[np.floating[Any]]]:
+    assert start.shape == (3,) and goal.shape == (3,), "Start and goal must be a 1D array of shape (3)"
+
+    obstacle_grid = obstacles.downsampling_to_grid(XY_GRID_RESOLUTION, min(Car.WIDTH, Car.LENGTH) / 2)
+    heuristic_grid = _distance_heuristic(obstacle_grid, goal[:2])
+    N, M = heuristic_grid.grid.shape
+    K = int(2 * np.pi / YAW_GRID_RESOLUTION)
+    dp = np.full((N, M, K), None, dtype=object)
+
+    def calc_ijk(x: float, y: float, yaw: float) -> tuple[int, int, int]:
+        i, j = heuristic_grid.calc_index([x, y])
+        k = int(wrap_angle(yaw, zero_to_2pi=True) // YAW_GRID_RESOLUTION)
+        return i, j, k
+
+    def generate_neighbour(cur: _Node, direction: int, steer: float) -> Optional[_Node]:
+        car = Car(*cur.trajectory[-1], velocity=float(direction), steer=steer)
+        trajectory = []
+        for _ in range(int(MOTION_DISTANCE / MOTION_RESOLUTION)):
+            car.update(MOTION_RESOLUTION)
+            if car.check_collision(obstacles):
+                return None
+            trajectory.append([car.x, car.y, car.yaw])
+
+        i, j, k = calc_ijk(car.x, car.y, car.yaw)
+        if not (0 <= i < N and 0 <= j < M):
+            print(f"Out of grid, please add more obstacles to fill the boundary: {i=} {j=}")
+            return None
+
+        distance_cost = MOTION_DISTANCE if direction == 1 else MOTION_DISTANCE * BACKWARDS_COST
+        switch_direction_cost = SWITCH_DIRECTION_COST if direction != cur.direction else 0.0
+        steer_change_cost = STEER_CHANGE_COST * np.abs(steer - cur.steer)
+        steer_cost = STEER_COST * np.abs(steer)
+        cost = cur.cost + distance_cost + switch_direction_cost + steer_change_cost + steer_cost
+        h_cost = H_COST * heuristic_grid.grid[i, j]
+
+        return _Node((i, j, k), np.array(trajectory), direction, steer, cost, h_cost, cur)
+
+    def generate_neighbours(cur: _Node) -> Generator[_Node, None, None]:
+        for direction, steer in product([1, -1], STEER_COMMANDS):
+            if (res := generate_neighbour(cur, direction, steer)) is not None:
+                yield res
+
+    def generate_rspath(node: _Node) -> Optional[RSPath]:
+        def check(path: RSPath) -> bool:
+            for x, y, yaw in zip(*path.coordinates_tuple()):
+                if Car(x, y, yaw).check_collision(obstacles):
+                    return False
+            return True
+
+        def calc_rspath_cost(path: RSPath) -> float:
+            last_direction = node.direction
+            last_steer = node.trajectory[-1, 2]
+
+            distance_cost = 0.0
+            switch_direction_cost = 0.0
+            steer_change_cost = 0.0
+            steer_cost = 0.0
+            for segment in path.segments:
+                distance_cost += segment.length if segment.direction == 1 else segment.length * BACKWARDS_COST
+                if segment.direction != last_direction:
+                    switch_direction_cost += SWITCH_DIRECTION_COST
+                    last_direction = segment.direction
+                steer = {"left": Car.MAX_STEER, "right": -Car.MAX_STEER, "straight": 0.0}[segment.type]
+                steer_change_cost += STEER_CHANGE_COST * np.abs(steer - last_steer)
+                last_steer = steer
+                steer_cost += STEER_COST * np.abs(steer)
+            return distance_cost + switch_direction_cost + steer_change_cost + steer_cost
+
+        pathes = solve_rspath(tuple(node.trajectory[-1]), tuple(goal), Car.MIN_TURNING_RADIUS, MOTION_RESOLUTION)
+        return min(filter(check, pathes), key=calc_rspath_cost, default=None)
+
+    def traceback_path(node: _Node, rspath: RSPath) -> npt.NDArray[np.floating[Any]]:
+        segments = []
+        while node.parent is not None:
+            segments.append(np.hstack((node.trajectory, np.full_like(node.trajectory[:, :1], node.direction))))
+            node = node.parent
+        segments.reverse()
+        segments.append([[p.x, p.y, p.yaw, p.driving_direction] for p in rspath.waypoints()])
+        return np.vstack(segments)
+
+    start_ijk = calc_ijk(*start)
+    start_node = _Node(start_ijk, np.array([start]), 1, 0.0, 0.0, H_COST * heuristic_grid.grid[start_ijk[:2]], None)
+    dp[start_ijk] = start_node
+    pq = [start_node]
+    while pq:
+        cur = heapq.heappop(pq)
+        if cur.cost > dp[cur.ijk].cost:
+            continue
+
+        if (rspath := generate_rspath(cur)) is not None:
+            return traceback_path(cur, rspath)
+
+        for neighbour in generate_neighbours(cur):
+            if dp[neighbour.ijk] is None or neighbour.cost < dp[neighbour.ijk].cost:
+                dp[neighbour.ijk] = neighbour
+                heapq.heappush(pq, neighbour)
+    return None

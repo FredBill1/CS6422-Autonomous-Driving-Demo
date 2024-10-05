@@ -1,0 +1,5 @@
+{
+    "black-formatter.args": [
+        "-l 120"
+    ]
+}
