@@ -35,7 +35,7 @@ class Car:
     TARGET_MAX_STEER = np.deg2rad(35.0)  # [rad], for global planner
     MAX_STEER_SPEED = np.deg2rad(360.0)  # [rad/s]
     MAX_SPEED = 55.0 / 3.6  #  [m/s]
-    MIN_SPEED = -20.0 / 3.6  #  [m/s]
+    MIN_SPEED = -30.0 / 3.6  #  [m/s]
     MAX_ACCEL = 15.0  #  [m/ss]
 
     TARGET_SPEED = 40.0 / 3.6  # [m/s]

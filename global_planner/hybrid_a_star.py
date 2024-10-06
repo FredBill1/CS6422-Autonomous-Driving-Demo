@@ -22,7 +22,7 @@ SWITCH_DIRECTION_COST = 100.0  # switch direction cost
 BACKWARDS_COST = 10.0  # backward penalty cost
 STEER_CHANGE_COST = 3.0  # steer angle change cost
 STEER_COST = 3.0  # steer angle cost
-H_COST = 7.0  # Heuristic cost
+H_COST = 5.0  # Heuristic cost
 
 
 STEER_COMMANDS = np.unique(
@@ -73,7 +73,9 @@ def hybrid_a_star(
 ) -> Optional[npt.NDArray[np.floating[Any]]]:
     assert start.shape == (3,) and goal.shape == (3,), "Start and goal must be a 1D array of shape (3)"
 
-    obstacle_grid = obstacles.downsampling_to_grid(XY_GRID_RESOLUTION, min(Car.WIDTH, Car.LENGTH) / 2)
+    obstacle_grid = obstacles.downsampling_to_grid(
+        XY_GRID_RESOLUTION, min(Car.COLLISION_LENGTH, Car.COLLISION_WIDTH) / 2
+    )
     heuristic_grid = _distance_heuristic(obstacle_grid, goal[:2])
     N, M = heuristic_grid.grid.shape
     K = int(2 * np.pi / YAW_GRID_RESOLUTION)
