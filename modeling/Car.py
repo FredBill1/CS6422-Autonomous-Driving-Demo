@@ -42,7 +42,10 @@ class Car:
 
     TARGET_MIN_TURNING_RADIUS = WHEEL_BASE / np.tan(TARGET_MAX_STEER)  # [m], for global planner
 
-    def update(self, dt: float, /, do_wrap_angle: bool = False) -> None:
+    def align_yaw(self, target_yaw: float) -> None:
+        self.yaw = target_yaw + wrap_angle(self.yaw - target_yaw)
+
+    def update(self, dt: float, /, do_wrap_angle: bool = True) -> None:
         self.x += self.velocity * np.cos(self.yaw) * dt
         self.y += self.velocity * np.sin(self.yaw) * dt
         self.yaw += self.velocity / self.WHEEL_BASE * np.tan(self.steer) * dt
@@ -50,7 +53,7 @@ class Car:
             self.yaw = wrap_angle(self.yaw)
 
     def update_with_control(
-        self, target_velocity: float, target_steer: float, dt: float, /, do_wrap_angle: bool = False
+        self, target_velocity: float, target_steer: float, dt: float, /, do_wrap_angle: bool = True
     ) -> None:
         self.update(dt, do_wrap_angle=do_wrap_angle)
         target_velocity = np.clip(target_velocity, self.MIN_SPEED, self.MAX_SPEED)

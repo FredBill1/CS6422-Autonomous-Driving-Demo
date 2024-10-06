@@ -61,7 +61,7 @@ def _predict_motion(state: Car, controls: npt.NDArray[np.floating[Any]], dt: flo
     state = state.copy()
     states = [[state.x, state.y, state.velocity, state.yaw]]
     for acceleration, steer in controls:
-        state.update_with_control(state.velocity + acceleration * dt, steer, dt)
+        state.update_with_control(state.velocity + acceleration * dt, steer, dt, do_wrap_angle=False)
         states.append([state.x, state.y, state.velocity, state.yaw])
     return np.array(states)
 
@@ -143,6 +143,9 @@ class ModelPredictiveControl:
         )
         xref = self._ref_trajectory[np.clip(ids.astype(int), None, self._ref_trajectory.shape[0] - 1)]
         xref = xref[:, [0, 1, 3, 2]]
+
+        state = state.copy()
+        state.align_yaw(xref[0, 3])
 
         controls, states = np.zeros((HORIZON_LENGTH, NU)), np.zeros((HORIZON_LENGTH + 1, NX))
         for _ in range(MAX_ITER):
