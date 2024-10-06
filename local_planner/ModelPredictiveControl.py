@@ -116,7 +116,11 @@ class ModelPredictiveControl:
         self._ref_trajectory = ref_trajectory
         self._ref_trajectory[:, 2] = smooth_yaw(self._ref_trajectory[:, 2])
         self._ref_trajectory[:, 3] *= Car.TARGET_SPEED
-        self._ref_trajectory[-1, 3] = 0.0
+        N = self._ref_trajectory.shape[0]
+        i, v = 0, 0.0
+        while i < N and (v := np.sqrt(2 * Car.MAX_ACCEL * COURSE_TICK * max(0, i - 0.5))) < Car.TARGET_SPEED:
+            self._ref_trajectory[N - 1 - i, 3] = np.sign(self._ref_trajectory[N - 1 - i, 3]) * v
+            i += 1
 
     def _nearist_point_index(self, state: Car) -> int:
         ref_xy = self._ref_trajectory[:NEARIST_POINT_SEARCH_COUNT, :2]
