@@ -1,7 +1,10 @@
+from concurrent.futures import ThreadPoolExecutor
+from queue import Empty, SimpleQueue
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-from global_planner.hybrid_a_star import hybrid_a_star
+from global_planner.hybrid_a_star import Node, hybrid_a_star
 from local_planner.ModelPredictiveControl import ModelPredictiveControl
 from modeling.Car import Car
 from modeling.Obstacles import Obstacles
@@ -49,16 +52,38 @@ def main(ax: plt.Axes):
     print(f"Start: {repr(START)}\nGoal: {repr(GOAL)}")
 
     print("Start Hybrid A* planning")
-    trajectory = hybrid_a_star(START, GOAL, obstacles)
+    ax.cla()
+    ax.plot(*obstacles.coordinates.T, ".r")
+    ax.arrow(*START[:2], np.cos(START[2]), np.sin(START[2]), head_width=0.5, head_length=1, fc="r", ec="r")
+    ax.arrow(*GOAL[:2], np.cos(GOAL[2]), np.sin(GOAL[2]), head_width=0.5, head_length=1, fc="g", ec="g")
+    ax.set_aspect("equal")
+    ax.title.set_text("Hybrid A* Planning")
+    plt.pause(0.1)
+
+    explored_nodes = SimpleQueue()
+    explored_nodes_artists = []
+    with ThreadPoolExecutor(1) as executor:
+        global_planner_thread = executor.submit(hybrid_a_star, START, GOAL, obstacles, explored_nodes.put)
+        while not global_planner_thread.done():
+            nodes: list[Node] = []
+            while True:
+                try:
+                    nodes.append(explored_nodes.get_nowait())
+                except Empty:
+                    break
+            for node in nodes:
+                explored_nodes_artists.extend(ax.plot(*node.get_plot_trajectory()[:, :2].T, "-y"))
+            plt.pause(0.1)
+        trajectory = global_planner_thread.result()
     print("Hybrid A* planning Finished")
     if trajectory is None:
         print("Goal is not reachable")
         return
 
-    ax.cla()
-    ax.plot(*obstacles.coordinates.T, ".r")
+    for artist in explored_nodes_artists:
+        artist.remove()
+
     ax.plot(*trajectory[:, :2].T, "-b")
-    ax.set_aspect("equal")
 
     print("Start MPC")
     state = Car(*START)
@@ -89,6 +114,7 @@ def main(ax: plt.Axes):
 
 
 if __name__ == "__main__":
-    _, ax = plt.subplots()
+    fig, ax = plt.subplots()
+    fig.canvas.mpl_connect("close_event", lambda _: quit())
     while True:
         main(ax)

@@ -1,5 +1,5 @@
 import heapq
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from itertools import product
 from typing import Any, Literal, NamedTuple, Optional
 
@@ -18,11 +18,11 @@ MOTION_RESOLUTION = 1.0  # [m] path interpolate resolution
 MOTION_DISTANCE = XY_GRID_RESOLUTION * 1.5  # [m] path interpolate distance
 NUM_STEER_COMMANDS = 6  # number of steer command
 
-SWITCH_DIRECTION_COST = 100.0  # switch direction cost
+SWITCH_DIRECTION_COST = 50.0  # switch direction cost
 BACKWARDS_COST = 10.0  # backward penalty cost
 STEER_CHANGE_COST = 3.0  # steer angle change cost
 STEER_COST = 3.0  # steer angle cost
-H_COST = 5.0  # Heuristic cost
+H_COST = 4.0  # Heuristic cost
 
 
 STEER_COMMANDS = np.unique(
@@ -51,25 +51,38 @@ def _distance_heuristic(grid: ObstacleGrid, goal_xy: npt.ArrayLike) -> ObstacleG
     return ObstacleGrid(grid.minx, grid.maxx, grid.miny, grid.maxy, grid.resolution, dist)
 
 
-class _SimplePath(NamedTuple):
+class SimplePath(NamedTuple):
     ijk: tuple[int, int, int]  # grid index
     trajectory: npt.NDArray[np.floating[Any]]  # [[x(m), y(m), yaw(rad)]]
     direction: Literal[1, -1]  # direction, 1 forward, -1 backward]
     steer: float  # [rad], [-TARGET_MAX_STEER, TARGET_MAX_STEER]
 
 
-class _Node(NamedTuple):
-    path: _SimplePath | RSPath
+class Node(NamedTuple):
+    path: SimplePath | RSPath
     cost: float
     h_cost: float
-    parent: Optional["_Node"]
+    parent: Optional["Node"]
 
-    def __lt__(self, other: "_Node") -> bool:
+    def __lt__(self, other: "Node") -> bool:
         return (self.h_cost + self.cost, self.cost) < (other.h_cost + other.cost, other.cost)
+
+    def get_plot_trajectory(self) -> npt.NDArray[np.floating[Any]]:
+        trajectory = (
+            np.array([[p.x, p.y, p.yaw] for p in self.path.waypoints()])
+            if isinstance(self.path, RSPath)
+            else self.path.trajectory
+        )
+        if self.parent is not None:
+            trajectory = np.vstack((self.parent.path.trajectory[-1], trajectory))
+        return trajectory
 
 
 def hybrid_a_star(
-    start: npt.NDArray[np.floating[Any]], goal: npt.NDArray[np.floating[Any]], obstacles: Obstacles
+    start: npt.NDArray[np.floating[Any]],
+    goal: npt.NDArray[np.floating[Any]],
+    obstacles: Obstacles,
+    callback: Optional[Callable[[Node], Any]] = None,
 ) -> Optional[npt.NDArray[np.floating[Any]]]:
     assert start.shape == (3,) and goal.shape == (3,), "Start and goal must be a 1D array of shape (3)"
 
@@ -86,7 +99,7 @@ def hybrid_a_star(
         k = int(wrap_angle(yaw, zero_to_2pi=True) // YAW_GRID_RESOLUTION)
         return i, j, k
 
-    def generate_neighbour(cur: _Node, direction: int, steer: float) -> Optional[_Node]:
+    def generate_neighbour(cur: Node, direction: int, steer: float) -> Optional[Node]:
         car = Car(*cur.path.trajectory[-1], velocity=float(direction), steer=steer)
         trajectory = []
         for _ in range(int(MOTION_DISTANCE / MOTION_RESOLUTION)):
@@ -107,14 +120,14 @@ def hybrid_a_star(
         cost = cur.cost + distance_cost + switch_direction_cost + steer_change_cost + steer_cost
         h_cost = H_COST * heuristic_grid.grid[i, j]
 
-        return _Node(_SimplePath((i, j, k), np.array(trajectory), direction, steer), cost, h_cost, cur)
+        return Node(SimplePath((i, j, k), np.array(trajectory), direction, steer), cost, h_cost, cur)
 
-    def generate_neighbours(cur: _Node) -> Generator[_Node, None, None]:
+    def generate_neighbours(cur: Node) -> Generator[Node, None, None]:
         for direction, steer in product([1, -1], STEER_COMMANDS):
             if (res := generate_neighbour(cur, direction, steer)) is not None:
                 yield res
 
-    def generate_rspath(node: _Node) -> Optional[_Node]:
+    def generate_rspath(node: Node) -> Optional[Node]:
         def check(path: RSPath) -> bool:
             for x, y, yaw in zip(*path.coordinates_tuple()):
                 if Car(x, y, yaw).check_collision(obstacles):
@@ -148,12 +161,12 @@ def hybrid_a_star(
         if (ret := min(pathes, key=lambda t: t[1], default=None)) is None:
             return None
         path, cost = ret
-        return _Node(path, node.cost + cost, 0.0, node)
+        return Node(path, node.cost + cost, 0.0, node)
 
-    def traceback_path(node: _Node, rspath: RSPath) -> npt.NDArray[np.floating[Any]]:
+    def traceback_path(node: Node, rspath: RSPath) -> npt.NDArray[np.floating[Any]]:
         segments = []
         while node is not None:
-            path: _SimplePath = node.path
+            path: SimplePath = node.path
             segments.append(np.hstack((path.trajectory, np.full_like(path.trajectory[:, :1], path.direction))))
             node = node.parent
         segments.reverse()
@@ -161,18 +174,23 @@ def hybrid_a_star(
         return np.vstack(segments)
 
     start_ijk = calc_ijk(*start)
-    start_node = _Node(
-        _SimplePath(start_ijk, np.array([start]), 1, 0.0), 0.0, H_COST * heuristic_grid.grid[start_ijk[:2]], None
+    start_node = Node(
+        SimplePath(start_ijk, np.array([start]), 1, 0.0), 0.0, H_COST * heuristic_grid.grid[start_ijk[:2]], None
     )
     dp[start_ijk] = start_node
     pq = [start_node]
     while pq:
         cur = heapq.heappop(pq)
         if isinstance(cur.path, RSPath):
+            if callback is not None:
+                callback(cur)
             return traceback_path(cur.parent, cur.path)
 
         if cur.cost > dp[cur.path.ijk].cost:
             continue
+
+        if callback is not None:
+            callback(cur)
 
         if (rsnode := generate_rspath(cur)) is not None:
             heapq.heappush(pq, rsnode)

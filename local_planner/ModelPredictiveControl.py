@@ -9,7 +9,7 @@ from utils.wrap_angle import smooth_yaw, wrap_angle
 
 COURSE_TICK = 1.0  # [m], equal to MOTION_RESOLUTION from hybrid_a_star.py
 
-NEARIST_POINT_SEARCH_RANGE = 10.0  # [m]
+NEARIST_POINT_SEARCH_RANGE = 5.0  # [m]
 NEARIST_POINT_SEARCH_COUNT = int(NEARIST_POINT_SEARCH_RANGE // COURSE_TICK)
 
 HORIZON_LENGTH = 5  # simulate count
