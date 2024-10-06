@@ -29,6 +29,10 @@ def get_test_obstacles() -> Obstacles:
     for i in range(40):
         ox.append(40.0)
         oy.append(60.0 - i)
+    for _ in range(20):
+        ox.append(np.random.uniform(0, 60))
+        oy.append(np.random.uniform(0, 60))
+
     return Obstacles(np.vstack((ox, oy)).T)
 
 
