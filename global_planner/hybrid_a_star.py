@@ -13,10 +13,10 @@ from modeling.Obstacles import ObstacleGrid, Obstacles
 from utils.wrap_angle import wrap_angle
 
 XY_GRID_RESOLUTION = 2.0  # [m]
-YAW_GRID_RESOLUTION = np.deg2rad(15.0)  # [rad]
+YAW_GRID_RESOLUTION = np.deg2rad(30.0)  # [rad]
 MOTION_RESOLUTION = 1.0  # [m] path interpolate resolution
 MOTION_DISTANCE = XY_GRID_RESOLUTION * 1.5  # [m] path interpolate distance
-NUM_STEER_COMMANDS = 10  # number of steer command
+NUM_STEER_COMMANDS = 6  # number of steer command
 
 SWITCH_DIRECTION_COST = 100.0  # switch direction cost
 BACKWARDS_COST = 10.0  # backward penalty cost
