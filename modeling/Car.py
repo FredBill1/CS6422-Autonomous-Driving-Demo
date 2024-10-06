@@ -42,14 +42,17 @@ class Car:
     MIN_TURNING_RADIUS_STRICT = WHEEL_BASE / np.tan(MAX_STEER)  # [m]
     MIN_TURNING_RADIUS = MIN_TURNING_RADIUS_STRICT * 1.5  # [m]
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, /, do_wrap_angle: bool = False) -> None:
         self.x += self.velocity * np.cos(self.yaw) * dt
         self.y += self.velocity * np.sin(self.yaw) * dt
         self.yaw += self.velocity / self.WHEEL_BASE * np.tan(self.steer) * dt
-        self.yaw = wrap_angle(self.yaw)
+        if do_wrap_angle:
+            self.yaw = wrap_angle(self.yaw)
 
-    def update_with_control(self, target_velocity: float, target_steer: float, dt: float) -> None:
-        self.update(dt)
+    def update_with_control(
+        self, target_velocity: float, target_steer: float, dt: float, /, do_wrap_angle: bool = False
+    ) -> None:
+        self.update(dt, do_wrap_angle=do_wrap_angle)
         target_velocity = np.clip(target_velocity, self.MIN_SPEED, self.MAX_SPEED)
         target_steer = np.clip(target_steer, -self.MAX_STEER, self.MAX_STEER)
         self.velocity += np.clip(target_velocity - self.velocity, -self.MAX_ACCEL * dt, self.MAX_ACCEL * dt)

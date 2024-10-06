@@ -13,9 +13,9 @@ NEARIST_POINT_SEARCH_RANGE = 10.0  # [m]
 NEARIST_POINT_SEARCH_COUNT = int(NEARIST_POINT_SEARCH_RANGE // COURSE_TICK)
 
 HORIZON_LENGTH = 5  # simulate count
-MIN_HORIZON_DISTANCE = 1.0  # [m]
+MIN_HORIZON_DISTANCE = 2.0  # [m]
 
-MAX_ITER = 5
+MAX_ITER = 10
 DU_TH = 0.1  # iteration finish param
 
 
@@ -79,14 +79,15 @@ def _linear_mpc_control(
         cost += cvxpy.quad_form(u[:, t], R)
         if t != 0:
             cost += cvxpy.quad_form(xref[:, t] - x[:, t], Q)
-        A, B, C = _get_linear_model_matrix(xbar[2, t], xbar[3, t], 0, dt)
+        A, B, C = _get_linear_model_matrix(xbar[2, t], xbar[3, t], last_steer, dt)
         constraints.append(x[:, t + 1] == A @ x[:, t] + B @ u[:, t] + C)
-        if t < (HORIZON_LENGTH - 1):
-            cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], R_D)
-            constraints.append(cvxpy.abs(u[1, t + 1] - u[1, t]) <= Car.MAX_STEER_SPEED * dt)
     cost += cvxpy.quad_form(xref[:, HORIZON_LENGTH] - x[:, HORIZON_LENGTH], Q_F)
 
-    constraints.append(u[1, 0] == last_steer)
+    constraints.append(cvxpy.abs(u[1, 0] - last_steer) <= Car.MAX_STEER_SPEED * dt)
+    for t in range(1, HORIZON_LENGTH):
+        cost += cvxpy.quad_form(u[:, t] - u[:, t - 1], R_D)
+        constraints.append(cvxpy.abs(u[1, t] - u[1, t - 1]) <= Car.MAX_STEER_SPEED * dt)
+
     constraints.append(x[:, 0] == xbar[:, 0])
     constraints.append(x[2, :] <= Car.MAX_SPEED)
     constraints.append(x[2, :] >= Car.MIN_SPEED)

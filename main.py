@@ -10,12 +10,6 @@ from modeling.Obstacles import Obstacles
 
 DT = 0.1
 
-START = np.array([10.0, 10.0, np.deg2rad(90.0)])
-GOAL = np.array([50.0, 55.0, np.deg2rad(-90.0)])
-
-A_STAR_RESULT_FILE = Path("tmp/trajectory.npy")
-A_STAR_READ_FROM_FILE = True
-
 
 def get_test_obstacles() -> Obstacles:
     ox, oy = [], []
@@ -40,18 +34,26 @@ def get_test_obstacles() -> Obstacles:
     return Obstacles(np.vstack((ox, oy)).T)
 
 
-def main():
+def main(ax: plt.Axes):
     obstacles = get_test_obstacles()
-    if A_STAR_READ_FROM_FILE and A_STAR_RESULT_FILE.exists():
-        trajectory = np.load(A_STAR_RESULT_FILE)
-    else:
-        print("Start Hybrid A* planning")
-        trajectory = hybrid_a_star(START, GOAL, obstacles)
-        print("Hybrid A* planning Finished")
-        A_STAR_RESULT_FILE.parent.mkdir(parents=True, exist_ok=True)
-        np.save(A_STAR_RESULT_FILE, trajectory)
 
-    _, ax = plt.subplots()
+    def get_random_car():
+        x = np.random.uniform((5, 5, -np.pi), (55, 55, np.pi))
+        while Car(*x).check_collision(obstacles):
+            x = np.random.uniform((5, 5, -np.pi), (55, 55, np.pi))
+        return x
+
+    START, GOAL = get_random_car(), get_random_car()
+    print(f"Start: {repr(START)}\nGoal: {repr(GOAL)}")
+
+    print("Start Hybrid A* planning")
+    trajectory = hybrid_a_star(START, GOAL, obstacles)
+    print("Hybrid A* planning Finished")
+    if trajectory is None:
+        print("Goal is not reachable")
+        return
+
+    ax.cla()
     ax.plot(*obstacles.coordinates.T, ".r")
     ax.plot(*trajectory[:, :2].T, "-b")
     ax.set_aspect("equal")
@@ -59,32 +61,33 @@ def main():
     print("Start MPC")
     state = Car(*START)
     mpc = ModelPredictiveControl(trajectory.copy())
+    result = None
     t = 0.0
     while True:
+        artists = []
+        artists.extend(state.plot(ax))
+        if result is not None and result.goal_reached:
+            break
+
         result = mpc.update(state, DT)
         acceleration, steer = result.controls[1]
         state.update_with_control(state.velocity + acceleration * DT, steer, DT)
-        print(state)
-
         t += DT
-        artists = []
-        artists.extend(state.plot(ax))
         artists.extend(ax.plot(*trajectory[:, :2].T, "-b"))
-        artists.extend(ax.plot(*result.states[:, :2].T, "xg"))
+        artists.extend(ax.plot(*result.states[:, :2].T, "-g"))
         artists.extend(ax.plot(*result.ref_states[:, :2].T, "xr"))
         ax.title.set_text(
             f"Time: {t:.1f}s Velocity: {state.velocity*3.6:.1f}km/s Steer: {np.rad2deg(steer):.1f}° Goal: {result.goal_reached}"
         )
-        if result.goal_reached:
-            break
 
         plt.pause(0.1)
         for artist in artists:
             artist.remove()
     print("MPC Finished")
-    plt.pause(0.1)
-    plt.show()
+    plt.pause(1)
 
 
 if __name__ == "__main__":
-    main()
+    _, ax = plt.subplots()
+    while True:
+        main(ax)
