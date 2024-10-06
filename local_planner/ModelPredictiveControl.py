@@ -7,7 +7,7 @@ import numpy.typing as npt
 from modeling.Car import Car
 from utils.wrap_angle import smooth_yaw
 
-COURSE_TICK = 0.1  # [m], equal to MOTION_RESOLUTION from hybrid_a_star.py
+COURSE_TICK = 1.0  # [m], equal to MOTION_RESOLUTION from hybrid_a_star.py
 
 NEARIST_POINT_SEARCH_RANGE = 10.0  # [m]
 NEARIST_POINT_SEARCH_COUNT = int(NEARIST_POINT_SEARCH_RANGE // COURSE_TICK)
