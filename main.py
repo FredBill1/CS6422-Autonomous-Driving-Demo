@@ -42,13 +42,15 @@ def get_test_obstacles() -> Obstacles:
 def main(ax: plt.Axes):
     obstacles = get_test_obstacles()
 
-    def get_random_car():
-        x = np.random.uniform((5, 5, -np.pi), (55, 55, np.pi))
-        while Car(*x).check_collision(obstacles):
-            x = np.random.uniform((5, 5, -np.pi), (55, 55, np.pi))
-        return x
+    def get_random_car(x, y):
+        state = np.random.uniform((x - 5, y - 5, -np.pi), (x + 5, y + 5, np.pi))
+        while Car(*state).check_collision(obstacles):
+            state = np.random.uniform((x - 5, y - 5, -np.pi), (x + 5, y + 5, np.pi))
+        return state
 
-    START, GOAL = get_random_car(), get_random_car()
+    START, GOAL = get_random_car(10, 10), get_random_car(50, 50)
+    if np.random.rand() < 0.5:
+        START, GOAL = GOAL, START
     print(f"Start: {repr(START)}\nGoal: {repr(GOAL)}")
 
     print("Start Hybrid A* planning")
