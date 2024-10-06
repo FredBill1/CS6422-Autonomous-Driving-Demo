@@ -1,7 +1,9 @@
 from dataclasses import dataclass, replace
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 
 from utils.wrap_angle import wrap_angle
 
@@ -10,11 +12,11 @@ from .Obstacles import Obstacles
 
 @dataclass(slots=True)
 class Car:
-    x: float  # [m]
-    y: float  # [m]
-    yaw: float  # [rad], [-pi, pi)
-    velocity: float = 0.0  # [m/s], [MIN_SPEED, MAX_SPEED]
-    steer: float = 0.0  # [rad], [-MAX_STEER, MAX_STEER]
+    x: float | npt.NDArray[np.floating[Any]]  # [m]
+    y: float | npt.NDArray[np.floating[Any]]  # [m]
+    yaw: float | npt.NDArray[np.floating[Any]]  # [rad], [-pi, pi)
+    velocity: float | npt.NDArray[np.floating[Any]] = 0.0  # [m/s], [MIN_SPEED, MAX_SPEED]
+    steer: float | npt.NDArray[np.floating[Any]] = 0.0  # [rad], [-MAX_STEER, MAX_STEER]
 
     WHEEL_BASE = 2.5  # [m]
 
@@ -42,20 +44,38 @@ class Car:
 
     TARGET_MIN_TURNING_RADIUS = WHEEL_BASE / np.tan(TARGET_MAX_STEER)  # [m], for global planner
 
+    LIDAR_RANGE = 20.0  # [m]
+    LIDAR_SIGMA = 1.0  # [m]
+    CONTROL_SIGMA = [0.1, np.deg2rad(3.0)]  # [m/s, rad], [velocity, steer]
+
     def align_yaw(self, target_yaw: float) -> None:
         self.yaw = target_yaw + wrap_angle(self.yaw - target_yaw)
 
-    def update(self, dt: float, /, do_wrap_angle: bool = True) -> None:
-        self.x += self.velocity * np.cos(self.yaw) * dt
-        self.y += self.velocity * np.sin(self.yaw) * dt
-        self.yaw += self.velocity / self.WHEEL_BASE * np.tan(self.steer) * dt
+    def update(self, dt: float, /, do_wrap_angle: bool = True, with_noise: bool = False) -> None:
+        v, s = self.velocity, self.steer
+        if with_noise:
+            v = np.random.randn(*np.shape(self.x)) * self.CONTROL_SIGMA[0] + v
+            s = np.random.randn(*np.shape(self.x)) * self.CONTROL_SIGMA[1] + s
+        self.x += v * np.cos(self.yaw) * dt
+        self.y += v * np.sin(self.yaw) * dt
+        self.yaw += v / self.WHEEL_BASE * np.tan(s) * dt
         if do_wrap_angle:
-            self.yaw = wrap_angle(self.yaw)
+            yaw = wrap_angle(self.yaw)
+            if isinstance(self.yaw, np.ndarray):
+                self.yaw[:] = yaw
+            else:
+                self.yaw = yaw
 
     def update_with_control(
-        self, target_velocity: float, target_steer: float, dt: float, /, do_wrap_angle: bool = True
+        self,
+        target_velocity: float,
+        target_steer: float,
+        dt: float,
+        /,
+        do_wrap_angle: bool = True,
+        with_noise: bool = False,
     ) -> None:
-        self.update(dt, do_wrap_angle=do_wrap_angle)
+        self.update(dt, do_wrap_angle=do_wrap_angle, with_noise=with_noise)
         target_velocity = np.clip(target_velocity, self.MIN_SPEED, self.MAX_SPEED)
         target_steer = np.clip(target_steer, -self.MAX_STEER, self.MAX_STEER)
         self.velocity += np.clip(target_velocity - self.velocity, -self.MAX_ACCEL * dt, self.MAX_ACCEL * dt)
@@ -98,3 +118,12 @@ class Car:
             artists.extend(ax.plot(*box.T, color))
         artists.extend(ax.plot(self.x, self.y, "*"))
         return artists
+
+    def lidar_scan(self, obstacles: Obstacles, /, with_noise: bool = False) -> npt.NDArray[np.floating[Any]]:
+        ids = obstacles.kd_tree.query_ball_point([self.x, self.y], self.LIDAR_RANGE)
+        scan = obstacles.coordinates[ids]
+        c, s = np.cos(self.yaw), np.sin(self.yaw)
+        scan = (scan - [self.x, self.y]) @ np.array([[c, s], [-s, c]])
+        if with_noise:
+            scan += np.random.randn(*scan.shape) * self.LIDAR_SIGMA
+        return scan

@@ -3,6 +3,7 @@ import numpy as np
 
 from global_planner.hybrid_a_star import hybrid_a_star
 from local_planner.ModelPredictiveControl import ModelPredictiveControl
+from localization.ParticleFilter import ParticleFilter
 from modeling.Car import Car
 from modeling.Obstacles import Obstacles
 
@@ -61,24 +62,33 @@ def main(ax: plt.Axes):
     ax.set_aspect("equal")
 
     print("Start MPC")
-    state = Car(*START)
+    real_state = Car(*START)
+    estimate_state = real_state.copy()
+    pf = ParticleFilter(START)
     mpc = ModelPredictiveControl(trajectory.copy())
     result = None
     t = 0.0
     while True:
         artists = []
-        artists.extend(state.plot(ax))
+        artists.extend(real_state.plot(ax, color="-k"))
+        artists.extend(estimate_state.plot(ax, color="-r"))
         if result is not None and result.goal_reached:
             break
 
-        result = mpc.update(state, DT)
+        result = mpc.update(estimate_state, DT)
         acceleration, steer = result.controls[1]
-        state.update_with_control(state.velocity + acceleration * DT, steer, DT)
+        control = (real_state.velocity + acceleration * DT, steer)
+
+        real_state.update_with_control(*control, DT, with_noise=True)
+        scan = real_state.lidar_scan(obstacles, with_noise=True)
+        pf_result = pf.update(control, obstacles, scan, DT)
+        estimate_state = pf_result.state
+        artists.append(ax.scatter(*pf_result.particles.T[:2], pf_result.weights * 5000, "g"))
         t += DT
         artists.extend(ax.plot(*result.states[:, :2].T, "-g"))
         artists.extend(ax.plot(*result.ref_states[:, :2].T, "xr"))
         ax.title.set_text(
-            f"Time: {t:.1f}s Velocity: {state.velocity*3.6:.1f}km/s Steer: {np.rad2deg(steer):.1f}° Goal: {result.goal_reached}"
+            f"Time: {t:.1f}s Velocity: {real_state.velocity*3.6:.1f}km/s Steer: {np.rad2deg(steer):.1f}° Goal: {result.goal_reached}"
         )
 
         plt.pause(0.1)
