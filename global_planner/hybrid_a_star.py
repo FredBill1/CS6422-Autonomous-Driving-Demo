@@ -25,7 +25,9 @@ STEER_COST = 3.0  # steer angle cost
 H_COST = 7.0  # Heuristic cost
 
 
-STEER_COMMANDS = np.unique(np.concatenate([np.linspace(-Car.MAX_STEER, Car.MAX_STEER, NUM_STEER_COMMANDS), [0.0]]))
+STEER_COMMANDS = np.unique(
+    np.concatenate([np.linspace(-Car.TARGET_MAX_STEER, Car.TARGET_MAX_STEER, NUM_STEER_COMMANDS), [0.0]])
+)
 
 
 MOVEMENTS = tuple((di, dj, np.sqrt(di**2 + dj**2)) for di in (-1, 0, 1) for dj in (-1, 0, 1) if di or dj)
@@ -53,7 +55,7 @@ class _SimplePath(NamedTuple):
     ijk: tuple[int, int, int]  # grid index
     trajectory: npt.NDArray[np.floating[Any]]  # [[x(m), y(m), yaw(rad)]]
     direction: Literal[1, -1]  # direction, 1 forward, -1 backward]
-    steer: float  # [rad], [-MAX_STEER, MAX_STEER]
+    steer: float  # [rad], [-TARGET_MAX_STEER, TARGET_MAX_STEER]
 
 
 class _Node(NamedTuple):
@@ -130,13 +132,15 @@ def hybrid_a_star(
                 if segment.direction != last_direction:
                     switch_direction_cost += SWITCH_DIRECTION_COST
                     last_direction = segment.direction
-                steer = {"left": Car.MAX_STEER, "right": -Car.MAX_STEER, "straight": 0.0}[segment.type]
+                steer = {"left": Car.TARGET_MAX_STEER, "right": -Car.TARGET_MAX_STEER, "straight": 0.0}[segment.type]
                 steer_change_cost += STEER_CHANGE_COST * np.abs(steer - last_steer)
                 last_steer = steer
                 steer_cost += STEER_COST * np.abs(steer)
             return distance_cost + switch_direction_cost + steer_change_cost + steer_cost
 
-        pathes = solve_rspath(tuple(node.path.trajectory[-1]), tuple(goal), Car.MIN_TURNING_RADIUS, MOTION_RESOLUTION)
+        pathes = solve_rspath(
+            tuple(node.path.trajectory[-1]), tuple(goal), Car.TARGET_MIN_TURNING_RADIUS, MOTION_RESOLUTION
+        )
         pathes = filter(check, pathes)
         pathes = ((path, calc_rspath_cost(path)) for path in pathes)
         if (ret := min(pathes, key=lambda t: t[1], default=None)) is None:

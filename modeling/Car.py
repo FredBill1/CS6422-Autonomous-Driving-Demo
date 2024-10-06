@@ -32,6 +32,7 @@ class Car:
     COLLISION_RADIUS = np.hypot(COLLISION_WIDTH / 2, COLLISION_LENGTH / 2)  # [m]
 
     MAX_STEER = np.deg2rad(40.0)  # [rad]
+    TARGET_MAX_STEER = np.deg2rad(35.0)  # [rad], for global planner
     MAX_STEER_SPEED = np.deg2rad(360.0)  # [rad/s]
     MAX_SPEED = 55.0 / 3.6  #  [m/s]
     MIN_SPEED = -20.0 / 3.6  #  [m/s]
@@ -39,8 +40,7 @@ class Car:
 
     TARGET_SPEED = 40.0 / 3.6  # [m/s]
 
-    MIN_TURNING_RADIUS_STRICT = WHEEL_BASE / np.tan(MAX_STEER)  # [m]
-    MIN_TURNING_RADIUS = MIN_TURNING_RADIUS_STRICT * 1.5  # [m]
+    TARGET_MIN_TURNING_RADIUS = WHEEL_BASE / np.tan(TARGET_MAX_STEER)  # [m], for global planner
 
     def update(self, dt: float, /, do_wrap_angle: bool = False) -> None:
         self.x += self.velocity * np.cos(self.yaw) * dt
