@@ -75,7 +75,6 @@ def main(ax: plt.Axes):
         acceleration, steer = result.controls[1]
         state.update_with_control(state.velocity + acceleration * DT, steer, DT)
         t += DT
-        artists.extend(ax.plot(*trajectory[:, :2].T, "-b"))
         artists.extend(ax.plot(*result.states[:, :2].T, "-g"))
         artists.extend(ax.plot(*result.ref_states[:, :2].T, "xr"))
         ax.title.set_text(
