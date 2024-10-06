@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 
 from modeling.Car import Car
-from utils.wrap_angle import smooth_yaw
+from utils.wrap_angle import smooth_yaw, wrap_angle
 
 COURSE_TICK = 1.0  # [m], equal to MOTION_RESOLUTION from hybrid_a_star.py
 
@@ -29,6 +29,7 @@ NX = 4  # [x, y, v, yaw]
 NU = 2  # [accel, steer]
 
 GOAL_MAX_DISTANCE = 1.5  # [m]
+GOAL_YAW_DIFF = np.deg2rad(45.0)  # [rad]
 GOAL_MAX_SPEED = 1.0 / 3.6  # [m/s]
 
 
@@ -130,6 +131,7 @@ class ModelPredictiveControl:
     def _goal_reached(self, state: Car) -> bool:
         return (
             np.linalg.norm(self._ref_trajectory[-1, :2] - [state.x, state.y]) < GOAL_MAX_DISTANCE
+            and abs(wrap_angle(self._ref_trajectory[-1, 2] - state.yaw)) < GOAL_YAW_DIFF
             and abs(state.velocity) < GOAL_MAX_SPEED
         )
 
