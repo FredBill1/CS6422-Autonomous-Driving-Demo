@@ -1,7 +1,9 @@
 from dataclasses import dataclass, replace
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 
 from utils.wrap_angle import wrap_angle
 
@@ -42,20 +44,36 @@ class Car:
 
     TARGET_MIN_TURNING_RADIUS = WHEEL_BASE / np.tan(TARGET_MAX_STEER)  # [m], for global planner
 
+    SCAN_RADIUS = 10.0  # [m]
+    SCAN_SIGMA = 0.25  # [m]
+
+    CONTROL_SIGMA = np.array([5.0 / 3.6, np.deg2rad(5.0)]) / MAX_SPEED  # [m/s, rad], [velocity, steer]
+
     def align_yaw(self, target_yaw: float) -> None:
         self.yaw = target_yaw + wrap_angle(self.yaw - target_yaw)
 
-    def update(self, dt: float, /, do_wrap_angle: bool = True) -> None:
-        self.x += self.velocity * np.cos(self.yaw) * dt
-        self.y += self.velocity * np.sin(self.yaw) * dt
-        self.yaw += self.velocity / self.WHEEL_BASE * np.tan(self.steer) * dt
+    def update(self, dt: float, /, do_wrap_angle: bool = True, with_noise: bool = False) -> None:
+        v, s = self.velocity, self.steer
+        control_sigma = self.CONTROL_SIGMA * v
+        if with_noise:
+            v = np.random.randn() * control_sigma[0] + v
+            s = np.random.randn() * control_sigma[1] + s
+        self.x += v * np.cos(self.yaw) * dt
+        self.y += v * np.sin(self.yaw) * dt
+        self.yaw += v / self.WHEEL_BASE * np.tan(s) * dt
         if do_wrap_angle:
             self.yaw = wrap_angle(self.yaw)
 
     def update_with_control(
-        self, target_velocity: float, target_steer: float, dt: float, /, do_wrap_angle: bool = True
+        self,
+        target_velocity: float,
+        target_steer: float,
+        dt: float,
+        /,
+        do_wrap_angle: bool = True,
+        with_noise: bool = False,
     ) -> None:
-        self.update(dt, do_wrap_angle=do_wrap_angle)
+        self.update(dt, do_wrap_angle=do_wrap_angle, with_noise=with_noise)
         target_velocity = np.clip(target_velocity, self.MIN_SPEED, self.MAX_SPEED)
         target_steer = np.clip(target_steer, -self.MAX_STEER, self.MAX_STEER)
         self.velocity += np.clip(target_velocity - self.velocity, -self.MAX_ACCEL * dt, self.MAX_ACCEL * dt)
@@ -76,6 +94,24 @@ class Car:
                 np.abs(candidates[:, 1]) < self.COLLISION_WIDTH / 2,
             )
         )
+
+    def world_to_local(self, world_coords: npt.NDArray[np.floating[Any]]) -> npt.NDArray[np.floating[Any]]:
+        cy, sy = np.cos(self.yaw), np.sin(self.yaw)
+        return (world_coords - [self.x, self.y]) @ np.array([[cy, sy], [-sy, cy]])
+
+    def local_to_world(self, local_coords: npt.NDArray[np.floating[Any]]) -> npt.NDArray[np.floating[Any]]:
+        cy, sy = np.cos(self.yaw), np.sin(self.yaw)
+        return local_coords @ np.array([[cy, -sy], [sy, cy]]) + [self.x, self.y]
+
+    def scan_obstacles(
+        self, obstacles: Obstacles, /, with_noise: bool = False
+    ) -> tuple[list[int], npt.NDArray[np.floating[Any]]]:
+        ids = obstacles.kd_tree.query_ball_point([self.x, self.y], self.SCAN_RADIUS, return_sorted=True)
+        scan = obstacles.coordinates[ids]
+        scan = self.world_to_local(scan)
+        if with_noise:
+            scan += np.random.randn(*scan.shape) * self.SCAN_SIGMA
+        return ids, scan
 
     def plot(self, ax: plt.Axes, color="-k") -> list[plt.Artist]:
         BOX = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1], [-1, -1]]) / 2
