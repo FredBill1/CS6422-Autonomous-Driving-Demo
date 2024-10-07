@@ -54,7 +54,7 @@ def _distance_heuristic(grid: ObstacleGrid, goal_xy: npt.ArrayLike) -> ObstacleG
 class SimplePath(NamedTuple):
     ijk: tuple[int, int, int]  # grid index
     trajectory: npt.NDArray[np.floating[Any]]  # [[x(m), y(m), yaw(rad)]]
-    direction: Literal[1, -1]  # direction, 1 forward, -1 backward]
+    direction: Literal[1, 0, -1]  # direction, 1 forward, -1 backward, 0 initial
     steer: float  # [rad], [-TARGET_MAX_STEER, TARGET_MAX_STEER]
 
 
@@ -114,7 +114,9 @@ def hybrid_a_star(
             return None
 
         distance_cost = MOTION_DISTANCE if direction == 1 else MOTION_DISTANCE * BACKWARDS_COST
-        switch_direction_cost = SWITCH_DIRECTION_COST if direction != cur.path.direction else 0.0
+        switch_direction_cost = (
+            SWITCH_DIRECTION_COST if cur.path.direction != 0 and direction != cur.path.direction else 0.0
+        )
         steer_change_cost = STEER_CHANGE_COST * np.abs(steer - cur.path.steer)
         steer_cost = STEER_COST * np.abs(steer)
         cost = cur.cost + distance_cost + switch_direction_cost + steer_change_cost + steer_cost
@@ -144,7 +146,7 @@ def hybrid_a_star(
             steer_cost = 0.0
             for segment in path.segments:
                 distance_cost += segment.length if segment.direction == 1 else segment.length * BACKWARDS_COST
-                if segment.direction != last_direction:
+                if last_direction != 0 and segment.direction != last_direction:
                     switch_direction_cost += SWITCH_DIRECTION_COST
                     last_direction = segment.direction
                 steer = {"left": Car.TARGET_MAX_STEER, "right": -Car.TARGET_MAX_STEER, "straight": 0.0}[segment.type]
@@ -164,6 +166,7 @@ def hybrid_a_star(
         return Node(path, node.cost + cost, 0.0, node)
 
     def traceback_path(node: Node, rspath: RSPath) -> npt.NDArray[np.floating[Any]]:
+        # returns [[x(m), y(m), yaw(rad), direction(1, -1)]]
         segments = []
         while node is not None:
             path: SimplePath = node.path
@@ -171,11 +174,14 @@ def hybrid_a_star(
             node = node.parent
         segments.reverse()
         segments.append([[p.x, p.y, p.yaw, p.driving_direction] for p in rspath.waypoints()])
-        return np.vstack(segments)
+        trajectory = np.vstack(segments)
+        if trajectory.shape[0] > 1:
+            trajectory[0, 3] = trajectory[1, 3]  # set the initial driving direction
+        return trajectory
 
     start_ijk = calc_ijk(*start)
     start_node = Node(
-        SimplePath(start_ijk, np.array([start]), 1, 0.0), 0.0, H_COST * heuristic_grid.grid[start_ijk[:2]], None
+        SimplePath(start_ijk, np.array([start]), 0, 0.0), 0.0, H_COST * heuristic_grid.grid[start_ijk[:2]], None
     )
     dp[start_ijk] = start_node
     pq = [start_node]
