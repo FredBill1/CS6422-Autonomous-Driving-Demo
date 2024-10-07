@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from queue import Empty, SimpleQueue
-
+import threading
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -10,7 +10,7 @@ from modeling.Car import Car
 from modeling.Obstacles import Obstacles
 
 DT = 0.1
-
+#1234asdfsdfasdfdddd
 
 def get_test_obstacles() -> Obstacles:
     ox, oy = [], []
@@ -53,6 +53,7 @@ def main(ax: plt.Axes):
         START, GOAL = GOAL, START
     print(f"Start: {repr(START)}\nGoal: {repr(GOAL)}")
 
+    #画图
     print("Start Hybrid A* planning")
     ax.cla()
     ax.plot(*obstacles.coordinates.T, ".r")
@@ -62,6 +63,8 @@ def main(ax: plt.Axes):
     ax.title.set_text("Hybrid A* Planning")
     plt.pause(0.1)
 
+    
+    #使用线程去调用hybrid_a_star算法
     explored_nodes = SimpleQueue()
     explored_nodes_artists = []
     with ThreadPoolExecutor(1) as executor:
@@ -88,7 +91,7 @@ def main(ax: plt.Axes):
     ax.plot(*trajectory[:, :2].T, "-b")
 
     print("Start MPC")
-    state = Car(*START)
+    state = Car(*START)  #state 
     mpc = ModelPredictiveControl(trajectory.copy())
     result = None
     t = 0.0
@@ -97,10 +100,10 @@ def main(ax: plt.Axes):
         artists.extend(state.plot(ax))
         if result is not None and result.goal_reached:
             break
-
-        result = mpc.update(state, DT)
-        acceleration, steer = result.controls[1]
-        state.update_with_control(state.velocity + acceleration * DT, steer, DT)
+        
+        result = mpc.update(state, DT) #mpc通过当前车的状态来获取加速度和方向盘
+        acceleration, steer = result.controls[1] #
+        state.update_with_control(state.velocity + acceleration * DT, steer, DT)  #
         t += DT
         artists.extend(ax.plot(*result.states[:, :2].T, "-g"))
         artists.extend(ax.plot(*result.ref_states[:, :2].T, "xr"))
