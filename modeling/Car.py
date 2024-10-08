@@ -69,7 +69,7 @@ class Car:
         target_velocity: float,
         target_steer: float,
         dt: float,
-        /,
+        *,
         do_wrap_angle: bool = True,
         with_noise: bool = False,
     ) -> None:
