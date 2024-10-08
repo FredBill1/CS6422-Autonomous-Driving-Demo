@@ -52,7 +52,7 @@ class Car:
     def align_yaw(self, target_yaw: float) -> None:
         self.yaw = target_yaw + wrap_angle(self.yaw - target_yaw)
 
-    def update(self, dt: float, /, do_wrap_angle: bool = True, with_noise: bool = False) -> None:
+    def update(self, dt: float, *, do_wrap_angle: bool = True, with_noise: bool = False) -> None:
         v, s = self.velocity, self.steer
         control_sigma = self.CONTROL_SIGMA * v
         if with_noise:
@@ -104,7 +104,7 @@ class Car:
         return local_coords @ np.array([[cy, -sy], [sy, cy]]) + [self.x, self.y]
 
     def scan_obstacles(
-        self, obstacles: Obstacles, /, with_noise: bool = False
+        self, obstacles: Obstacles, *, with_noise: bool = False
     ) -> tuple[list[int], npt.NDArray[np.floating[Any]]]:
         ids = obstacles.kd_tree.query_ball_point([self.x, self.y], self.SCAN_RADIUS, return_sorted=True)
         scan = obstacles.coordinates[ids]
