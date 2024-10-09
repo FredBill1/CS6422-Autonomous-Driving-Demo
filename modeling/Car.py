@@ -87,7 +87,7 @@ class Car:
         center_x, center_y = self.x + self.BACK_TO_CENTER * c, self.y + self.BACK_TO_CENTER * s
         ids = obstacles.kd_tree.query_ball_point([center_x, center_y], self.COLLISION_RADIUS)
         candidates = obstacles.coordinates[ids]
-        candidates = (candidates - [center_x, center_y]) @ np.array([[c, s], [-s, c]])
+        candidates = (candidates - [center_x, center_y]) @ np.array([[c, -s], [s, c]])
         return np.any(
             np.logical_and(
                 np.abs(candidates[:, 0]) < self.COLLISION_LENGTH / 2,
