@@ -1,0 +1,7 @@
+numpy
+scipy
+matplotlib
+rsplan
+cvxpy
+PySide6
+qt_material
