@@ -75,6 +75,7 @@ class Node(NamedTuple):
         return (self.h_cost + self.cost, self.cost) < (other.h_cost + other.cost, other.cost)
 
     def get_plot_trajectory(self) -> npt.NDArray[np.floating[Any]]:
+        "Get the trajectory coordinates for visualization"
         trajectory = (
             np.array([[p.x, p.y] for p in self.path.waypoints()])
             if isinstance(self.path, RSPath)
