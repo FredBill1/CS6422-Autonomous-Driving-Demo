@@ -84,37 +84,52 @@ def _linear_mpc_control(
     The car motion model is approximated as linear on dt, and cvxpy is used to solve the optimal control
     output u after approximation. Recalculate u as the new initial condition, and it will converge to a
     local minimum after several iterations.
-    """
 
+    Reference:
+    https://github.com/AtsushiSakai/PythonRobotics/blob/master/PathTracking/model_predictive_speed_and_steer_control/model_predictive_speed_and_steer_control.py
+    """
     # Note: ndarrays in this function are transposed
-    "https://github.com/AtsushiSakai/PythonRobotics/blob/master/PathTracking/model_predictive_speed_and_steer_control/model_predictive_speed_and_steer_control.py"
     x = cvxpy.Variable((NX, HORIZON_LENGTH + 1))  # [x, y, v, yaw]
     u = cvxpy.Variable((NU, HORIZON_LENGTH))  # [accel, steer]
 
     cost = 0.0
     constraints = []
     for t in range(HORIZON_LENGTH):
+        # prefer control to be small
         cost += cvxpy.quad_form(u[:, t], R)
         if t != 0:
+            # prefer state to be close to reference
             cost += cvxpy.quad_form(xref[:, t] - x[:, t], Q)
+
+        # make sure the next state is transformed from the previous state using the approximated linear model
         A, B, C = _get_linear_model_matrix(xbar[2, t], xbar[3, t], last_steer, dt)
         constraints.append(x[:, t + 1] == A @ x[:, t] + B @ u[:, t] + C)
+
+    # prefer final state to be close to reference
     cost += cvxpy.quad_form(xref[:, HORIZON_LENGTH] - x[:, HORIZON_LENGTH], Q_F)
 
+    # make sure steer change is within the maximum steer speed
     constraints.append(cvxpy.abs(u[1, 0] - last_steer) <= Car.MAX_STEER_SPEED * dt)
+
     for t in range(1, HORIZON_LENGTH):
+        # prefer control difference between two steps to be small
         cost += cvxpy.quad_form(u[:, t] - u[:, t - 1], R_D)
+
+        # make sure steer change is within the maximum steer speed
         constraints.append(cvxpy.abs(u[1, t] - u[1, t - 1]) <= Car.MAX_STEER_SPEED * dt)
 
+    # make sure initial state is the current state
     constraints.append(x[:, 0] == xbar[:, 0])
+    # make sure speed at every step is in range
     constraints.append(x[2, :] <= Car.MAX_SPEED)
     constraints.append(x[2, :] >= Car.MIN_SPEED)
+    # make sure acceleration at every step is in range
     constraints.append(cvxpy.abs(u[0, :]) <= Car.MAX_ACCEL)
     constraints.append(cvxpy.abs(u[1, :]) <= Car.MAX_STEER)
 
+    # solve the problem
     prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
     prob.solve(solver=cvxpy.CLARABEL, verbose=False)
-
     if prob.status not in (cvxpy.OPTIMAL, cvxpy.OPTIMAL_INACCURATE):
         print(f"Error: Cannot solve mpc: {prob.status}")
         return None
