@@ -133,7 +133,11 @@ class ModelPredictiveControl:
         assert ref_trajectory.shape[1] == 4, "Reference trajectory have [[x, y, yaw, direction], ...]"
         self._ref_trajectory = ref_trajectory
         self._ref_trajectory[:, 2] = smooth_yaw(self._ref_trajectory[:, 2])
+
+        # make the target velocity at each point of the trajectory to be TARGET_SPEED
         self._ref_trajectory[:, 3] *= Car.TARGET_SPEED
+
+        # let the last few points of the trajectory to have zero velocity, to make the vehicle stop at the goal
         N = self._ref_trajectory.shape[0]
         for i in range(min(N, round(GOAL_MAX_DISTANCE / COURSE_TICK))):
             self._ref_trajectory[N - 1 - i, 3] = 0.0
@@ -151,7 +155,7 @@ class ModelPredictiveControl:
         )
 
     def update(self, state: Car, dt: float) -> MPCResult:
-        # Find the closest point in the reference trajectory
+        # Find the closest point in the reference trajectory, discarding the points that have been passed.
         self._ref_trajectory = self._ref_trajectory[self._nearist_point_index(state) :]
         ids = np.round(
             np.arange(HORIZON_LENGTH + 1)

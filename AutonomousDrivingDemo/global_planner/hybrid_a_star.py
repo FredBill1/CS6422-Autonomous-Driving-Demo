@@ -21,7 +21,7 @@ NUM_STEER_COMMANDS = 20  # number of steer command
 SWITCH_DIRECTION_COST = 25.0  # switch direction cost
 BACKWARDS_COST = 4.0  # backward penalty cost
 STEER_CHANGE_COST = 3.0  # steer angle change cost
-STEER_COST = 1.5  # steer angle cost
+STEER_COST = 1.5  # steer angle cost per distance
 H_DIST_COST = 4.5  # Heuristic distance cost
 H_YAW_COST = 3.0 / np.deg2rad(45)  # Heuristic yaw difference cost
 H_COLLISION_COST = 1e4  # collision cost when calculating heuristic
@@ -94,13 +94,16 @@ def hybrid_a_star(
     if Car(*goal).check_collision(obstacles):
         return None
 
+    # downsample the obstacle map to a grid
     obstacle_grid = obstacles.downsampling_to_grid(
         XY_GRID_RESOLUTION, min(Car.COLLISION_LENGTH, Car.COLLISION_WIDTH) / 2
     )
+
+    # precompute the distance to the goal for each grid cell, where the distance will be used as a heuristic
     heuristic_grid = _distance_heuristic(obstacle_grid, goal[:2])
     N, M = heuristic_grid.grid.shape
     K = int(2 * np.pi / YAW_GRID_RESOLUTION)
-    dp = np.full((N, M, K), None, dtype=object)
+    dp = np.full((N, M, K), None, dtype=Node)  # used to record the path and cost for each grid cell
 
     def calc_ijk(x: float, y: float, yaw: float) -> tuple[int, int, int]:
         i, j = heuristic_grid.calc_index([x, y])
