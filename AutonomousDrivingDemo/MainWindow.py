@@ -97,6 +97,8 @@ class MainWindow(QMainWindow):
         self._measured_velocities: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_timestamps: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
+        self._car_simulation_stopped = True
+        self._pressed_position: Optional[_PressedPosition] = None
 
         # setup ui
         self._ui = Ui_MainWindow()
@@ -120,15 +122,21 @@ class MainWindow(QMainWindow):
         self._measured_steer_ax.set_ylim(-np.rad2deg(Car.MAX_STEER) - 5.0, np.rad2deg(Car.MAX_STEER) + 5.0)
         self._measured_state_artists = self._measured_state.plot(ax=self._visualization_ax)
         self._obstacles_artists = self._visualization_ax.plot(*self._obstacles.coordinates.T, ".r")
+        self._pressed_position_artists: list[plt.Line2D] = []
+        self._global_planner_segments_collections: list[LineCollection] = []
+        self._trajectory_artist: plt.Line2D = self._visualization_ax.plot([], [], "-b")[0]
+        self._local_trajectory_artist: plt.Line2D = self._visualization_ax.plot([], [], "-g")[0]
+        self._reference_points_artist: plt.Line2D = self._visualization_ax.plot([], [], "xr")[0]
+        self._goal_unreachable_text: plt.Text = self._visualization_ax.text(
+            0, 0, "Goal is unreachable", fontsize=12, color="r", visible=False
+        )
 
         # connect ui signals
         self._ui.cancel_button.clicked.connect(self.cancel)
         self._ui.navigate_button.toggled.connect(lambda _: self._navigation_toolbar.pan())
-        self._pressed_position: Optional[_PressedPosition] = None
-        self._pressed_position_artists: list[plt.Line2D] = []
         self._visualization_canvas.mpl_connect("button_press_event", self._canvas_on_press)
-        self._visualization_canvas.mpl_connect("motion_notify_event", self._canvas_on_move)
         self._visualization_canvas.mpl_connect("button_release_event", self._canvas_on_release)
+        self._visualization_canvas.mpl_connect("motion_notify_event", self._canvas_on_move)
 
         # Car Simulation Node
         self._car_simulation_node = CarSimulationNode(
@@ -140,39 +148,33 @@ class MainWindow(QMainWindow):
         )
         self._car_simulation_thread = QThread(self)
         self._car_simulation_node.moveToThread(self._car_simulation_thread)
-        self._car_simulation_node.measured_state.connect(self._update_measured_state)
-        self._car_simulation_thread.started.connect(self._car_simulation_node.start_simulation)
-        self.canceled.connect(self._car_simulation_node.stop)
-        self.set_state.connect(self._car_simulation_node.set_state)
-        self._car_simulation_stopped = True
 
         # Global Planner Node
         self._global_planner_node = GlobalPlannerNode(segment_collection_size=GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE)
         self._global_planner_thread = QThread(self)
         self._global_planner_node.moveToThread(self._global_planner_thread)
-        self._global_planner_node.trajectory.connect(self._update_trajectory)
-        self._global_planner_node.display_segments.connect(self._update_global_planner_display_segments)
-        self._global_planner_node.finished.connect(self._car_simulation_node.resume)
-        self.set_goal.connect(self._global_planner_node.plan)
-        self.canceled.connect(self._global_planner_node.cancel)
-        self._global_planner_segments_collections: list[LineCollection] = []
-        self._trajectory_artist: plt.Line2D = self._visualization_ax.plot([], [], "-b")[0]
-        self._goal_unreachable_text: plt.Text = self._visualization_ax.text(
-            0, 0, "Goal is unreachable", fontsize=12, color="r", visible=False
-        )
 
         # Local Planner Node
         self._local_planner_node = LocalPlannerNode(delta_time_s=LOCAL_PLANNER_DELTA_TIME)
         self._local_planner_thread = QThread(self)
         self._local_planner_node.moveToThread(self._local_planner_thread)
-        self._global_planner_node.trajectory.connect(self._local_planner_node.set_trajectory)
+
+        # Connect signals
         self._car_simulation_node.measured_state.connect(self._local_planner_node.update)
+        self._car_simulation_node.measured_state.connect(self._update_measured_state)
+        self._car_simulation_thread.started.connect(self._car_simulation_node.start_simulation)
+        self._global_planner_node.display_segments.connect(self._update_global_planner_display_segments)
+        self._global_planner_node.finished.connect(self._car_simulation_node.resume)
+        self._global_planner_node.trajectory.connect(self._local_planner_node.set_trajectory)
+        self._global_planner_node.trajectory.connect(self._update_trajectory)
         self._local_planner_node.control.connect(self._car_simulation_node.set_control)
         self._local_planner_node.local_trajectory.connect(self._update_local_trajectory)
         self._local_planner_node.reference_points.connect(self._update_reference_points)
+        self.canceled.connect(self._car_simulation_node.stop)
+        self.canceled.connect(self._global_planner_node.cancel)
         self.canceled.connect(self._local_planner_node.cancel)
-        self._local_trajectory_artist: plt.Line2D = self._visualization_ax.plot([], [], "-g")[0]
-        self._reference_points_artist: plt.Line2D = self._visualization_ax.plot([], [], "xr")[0]
+        self.set_goal.connect(self._global_planner_node.plan)
+        self.set_state.connect(self._car_simulation_node.set_state)
 
         # start tasks and threads
         self._ax_func_animation = FuncAnimation(
