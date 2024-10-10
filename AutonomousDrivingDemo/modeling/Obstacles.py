@@ -25,11 +25,15 @@ class Obstacles:
         self.kd_tree = KDTree(coordinates)
 
     def downsampling_to_grid(self, resolution: float, radius: float) -> ObstacleGrid:
+        "downsample the obstacles to a grid with a given resolution in meters, and a given collision radius."
+        # calculate the range and the size of the grid
         half_res = resolution / 2
         minx, maxx = np.min(self.coordinates[:, 0]) - half_res, np.max(self.coordinates[:, 0]) + half_res
         miny, maxy = np.min(self.coordinates[:, 1]) - half_res, np.max(self.coordinates[:, 1]) + half_res
         x_count, y_count = round((maxx - minx) / resolution), round((maxy - miny) / resolution)
         maxx, maxy = minx + x_count * resolution, miny + y_count * resolution
+
+        # generate a meshgrid of center points of each cell of the grid
         points = np.array(
             np.meshgrid(
                 np.arange(minx + half_res, maxx, resolution),
@@ -37,6 +41,10 @@ class Obstacles:
                 indexing="ij",
             )
         ).T.reshape(-1, 2)
+
+        # query the obstacles within the collision radius of each point of the grid, determine whether
+        # the center of a cell is within the collision radius of any obstacle
         dist, _ = self.kd_tree.query(points, k=1, distance_upper_bound=radius + resolution)
         grid = (dist <= radius).reshape(y_count, x_count)
+
         return ObstacleGrid(minx, maxx, miny, maxy, resolution, grid)

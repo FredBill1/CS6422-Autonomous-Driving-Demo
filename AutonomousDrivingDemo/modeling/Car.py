@@ -28,8 +28,8 @@ class Car:
 
     BACK_TO_CENTER = LENGTH / 2 - BACK_TO_WHEEL  # [m]
 
-    COLLISION_LENGTH = LENGTH + 2.0  # [m]
-    COLLISION_WIDTH = WIDTH + 2.0  # [m]
+    COLLISION_LENGTH = LENGTH + 0.5  # [m]
+    COLLISION_WIDTH = WIDTH + 0.5  # [m]
     COLLISION_RADIUS = np.hypot(COLLISION_WIDTH / 2, COLLISION_LENGTH / 2)  # [m]
 
     MAX_STEER = np.deg2rad(40.0)  # [rad]
@@ -49,9 +49,11 @@ class Car:
     CONTROL_SIGMA = np.array([5.0 / 3.6, np.deg2rad(5.0)]) / MAX_SPEED  # [m/s, rad], [velocity, steer]
 
     def align_yaw(self, target_yaw: float) -> None:
+        "align the car's yaw to the target yaw, ensuring the angular distance is less than pi"
         self.yaw = target_yaw + wrap_angle(self.yaw - target_yaw)
 
     def update(self, dt: float, *, do_wrap_angle: bool = True, with_noise: bool = False) -> None:
+        "predict the next state of the car after `dt` seconds"
         v, s = self.velocity, self.steer
         control_sigma = self.CONTROL_SIGMA * v
         if with_noise:
@@ -72,9 +74,12 @@ class Car:
         do_wrap_angle: bool = True,
         with_noise: bool = False,
     ) -> None:
+        "predict the next state of the car after `dt` seconds with the given control inputs"
         self.update(dt, do_wrap_angle=do_wrap_angle, with_noise=with_noise)
+        # clip by the maximum values
         target_velocity = np.clip(target_velocity, self.MIN_SPEED, self.MAX_SPEED)
         target_steer = np.clip(target_steer, -self.MAX_STEER, self.MAX_STEER)
+        # clip by the maximum accels
         self.velocity += np.clip(target_velocity - self.velocity, -self.MAX_ACCEL * dt, self.MAX_ACCEL * dt)
         self.steer += np.clip(target_steer - self.steer, -self.MAX_STEER_SPEED * dt, self.MAX_STEER_SPEED * dt)
 
@@ -82,11 +87,19 @@ class Car:
         return replace(self)
 
     def check_collision(self, obstacles: Obstacles) -> bool:
+        "Check if the car collides with any obstacles in the given `Obstacles` instance."
+
+        # calculate the center of the car, since (self.x, self.y) represents the coordinate of the middle of the rear wheels
         c, s = np.cos(self.yaw), np.sin(self.yaw)
         center_x, center_y = self.x + self.BACK_TO_CENTER * c, self.y + self.BACK_TO_CENTER * s
+
+        # query the obstacles within the collision radius
         ids = obstacles.kd_tree.query_ball_point([center_x, center_y], self.COLLISION_RADIUS)
         candidates = obstacles.coordinates[ids]
+
+        # translate and then rotate the coordinates of the obstacles to the car's local frame, to facilitate checking
         candidates = (candidates - [center_x, center_y]) @ np.array([[c, -s], [s, c]])
+
         return np.any(
             np.logical_and(
                 np.abs(candidates[:, 0]) < self.COLLISION_LENGTH / 2,
