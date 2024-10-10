@@ -33,7 +33,15 @@ GOAL_YAW_DIFF = np.deg2rad(45.0)  # [rad]
 GOAL_MAX_SPEED = 1.0 / 3.6  # [m/s]
 
 
-def _get_linear_model_matrix(velocity, yaw, steer, dt: float):
+def _get_linear_model_matrix(
+    velocity: float, yaw: float, steer: float, dt: float
+) -> tuple[npt.NDArray[np.floating[Any]], npt.NDArray[np.floating[Any]], npt.NDArray[np.floating[Any]]]:
+    """
+    The linear approximation of the vehicle's motion model, by assuming velocity, yaw, and steer are constant in dt.
+
+    >>> X[t+dt] = A @ X[t] + B @ u[t] + C
+    where X[t] = [x, y, v, yaw], u[t] = [accel, steer] of timestamp t.
+    """
     # Note: ndarrays in this function are transposed
     sy, cy, cs = np.sin(yaw), np.cos(yaw), np.cos(steer)
     A = np.zeros((NX, NX))
@@ -58,6 +66,9 @@ def _get_linear_model_matrix(velocity, yaw, steer, dt: float):
 
 
 def _predict_motion(state: Car, controls: npt.NDArray[np.floating[Any]], dt: float) -> npt.NDArray[np.floating[Any]]:
+    """
+    Predict the next `HORIZON_LENGTH` motions of the vehicle with the given controls, `len(controls) == HORIZON_LENGTH`.
+    """
     state = state.copy()
     states = [[state.x, state.y, state.velocity, state.yaw]]
     for acceleration, steer in controls:
@@ -69,6 +80,12 @@ def _predict_motion(state: Car, controls: npt.NDArray[np.floating[Any]], dt: flo
 def _linear_mpc_control(
     xref: npt.NDArray[np.floating[Any]], xbar: npt.NDArray[np.floating[Any]], last_steer: float, dt: float
 ) -> tuple[npt.NDArray[np.floating[Any]], npt.NDArray[np.floating[Any]]]:
+    """
+    The car motion model is approximated as linear on dt, and cvxpy is used to solve the optimal control
+    output u after approximation. Recalculate u as the new initial condition, and it will converge to a
+    local minimum after several iterations.
+    """
+
     # Note: ndarrays in this function are transposed
     "https://github.com/AtsushiSakai/PythonRobotics/blob/master/PathTracking/model_predictive_speed_and_steer_control/model_predictive_speed_and_steer_control.py"
     x = cvxpy.Variable((NX, HORIZON_LENGTH + 1))  # [x, y, v, yaw]
@@ -105,10 +122,10 @@ def _linear_mpc_control(
 
 
 class MPCResult(NamedTuple):
-    controls: npt.NDArray[np.floating[Any]]
-    states: npt.NDArray[np.floating[Any]]
-    ref_states: npt.NDArray[np.floating[Any]]
-    goal_reached: bool
+    controls: npt.NDArray[np.floating[Any]]  # [[accel, steer]], target output controls
+    states: npt.NDArray[np.floating[Any]]  # [[x, y, v, yaw]], predicted states
+    ref_states: npt.NDArray[np.floating[Any]]  # [[x, y, v, yaw]], reference states on the trajectory
+    goal_reached: bool  # whether the goal is reached
 
 
 class ModelPredictiveControl:
@@ -134,17 +151,21 @@ class ModelPredictiveControl:
         )
 
     def update(self, state: Car, dt: float) -> MPCResult:
+        # Find the closest point in the reference trajectory
         self._ref_trajectory = self._ref_trajectory[self._nearist_point_index(state) :]
         ids = np.round(
             np.arange(HORIZON_LENGTH + 1)
             * (max(MIN_HORIZON_DISTANCE / HORIZON_LENGTH, abs(state.velocity) * dt) / COURSE_TICK)
         )
         xref = self._ref_trajectory[np.clip(ids.astype(int), None, self._ref_trajectory.shape[0] - 1)]
-        xref = xref[:, [0, 1, 3, 2]]
+        xref = xref[:, [0, 1, 3, 2]]  # [x, y, yaw, v] -> [x, y, v, yaw]
 
+        # Align the yaw of the vehicle with the reference trajectory, to facilitate the calculation of
+        # the yaw difference between the current state and the reference trajectory.
         state = state.copy()
         state.align_yaw(xref[0, 3])
 
+        # iteratively solve the linearized problem
         controls, states = np.zeros((HORIZON_LENGTH, NU)), np.zeros((HORIZON_LENGTH + 1, NX))
         for _ in range(MAX_ITER):
             xbar = _predict_motion(state, controls, dt)
