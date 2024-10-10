@@ -165,6 +165,12 @@ def hybrid_a_star(
             return True
 
         def calc_rspath_cost(path: RSPath) -> float:
+            """
+            Same logic to calculate the cost of a path in the `generate_neighbour` above, except that:
+
+            1. the heuristic cost is 0, since the Reeds-Shepp path is directly from the current node to the goal.
+            2. the cost of the path is calculated as the sum of the cost of each segment in the path.
+            """
             last_direction = node.path.direction
             last_steer = node.path.trajectory[-1, 2]
 
@@ -219,7 +225,7 @@ def hybrid_a_star(
             trajectory[0, 3] = trajectory[1, 3]  # set the initial driving direction
         return trajectory
 
-    # start the A* search
+    # A* search (Similar to Dijkstra's algorithm, but with a heuristic cost added)
     start_ijk = calc_ijk(*start)
     start_node = Node(
         SimplePath(start_ijk, np.array([start]), 0, 0.0), 0.0, H_DIST_COST * heuristic_grid.grid[start_ijk[:2]], None
