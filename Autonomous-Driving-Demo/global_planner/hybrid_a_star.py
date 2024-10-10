@@ -125,7 +125,7 @@ def hybrid_a_star(
             SWITCH_DIRECTION_COST if cur.path.direction != 0 and direction != cur.path.direction else 0.0
         )
         steer_change_cost = STEER_CHANGE_COST * np.abs(steer - cur.path.steer)
-        steer_cost = STEER_COST * np.abs(steer)
+        steer_cost = STEER_COST * np.abs(steer) * MOTION_DISTANCE
         cost = cur.cost + distance_cost + switch_direction_cost + steer_change_cost + steer_cost
         h_cost = H_COST * heuristic_grid.grid[i, j]
 
@@ -155,11 +155,11 @@ def hybrid_a_star(
                 distance_cost += segment.length if segment.direction == 1 else segment.length * BACKWARDS_COST
                 if last_direction != 0 and segment.direction != last_direction:
                     switch_direction_cost += SWITCH_DIRECTION_COST
-                    last_direction = segment.direction
+                last_direction = segment.direction
                 steer = {"left": Car.TARGET_MAX_STEER, "right": -Car.TARGET_MAX_STEER, "straight": 0.0}[segment.type]
                 steer_change_cost += STEER_CHANGE_COST * np.abs(steer - last_steer)
                 last_steer = steer
-                steer_cost += STEER_COST * np.abs(steer)
+                steer_cost += STEER_COST * np.abs(steer) * segment.length
             return distance_cost + switch_direction_cost + steer_change_cost + steer_cost
 
         pathes = solve_rspath(
