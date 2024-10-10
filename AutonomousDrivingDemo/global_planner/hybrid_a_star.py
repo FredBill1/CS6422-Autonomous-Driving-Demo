@@ -17,15 +17,19 @@ XY_GRID_RESOLUTION = 1.0  # [m]
 YAW_GRID_RESOLUTION = np.deg2rad(15.0)  # [rad]
 MOTION_RESOLUTION = 0.5  # [m] path interpolate resolution
 MOTION_DISTANCE = XY_GRID_RESOLUTION * 1.5  # [m] path interpolate distance
-NUM_STEER_COMMANDS = 8  # number of steer command
+NUM_STEER_COMMANDS = 10  # number of steer command
 
 SWITCH_DIRECTION_COST = 25.0  # switch direction cost
-BACKWARDS_COST = 4.0  # backward penalty cost
+BACKWARDS_COST = 4.0  # backward movement cost
 STEER_CHANGE_COST = 3.0  # steer angle change cost
 STEER_COST = 1.5  # steer angle cost per distance
 H_DIST_COST = 2.0  # Heuristic distance cost
 H_YAW_COST = 3.0 / np.deg2rad(45)  # Heuristic yaw difference cost
 H_COLLISION_COST = 1e4  # collision cost when calculating heuristic
+
+# if True, return the Reeds-Shepp path immediately when it is found
+# otherwise, continue the A* search to find a better path (may be much slower)
+RETURN_RS_PATH_IMMEDIATELY = True
 
 STEER_COMMANDS = np.unique(
     np.concatenate([np.linspace(-Car.TARGET_MAX_STEER, Car.TARGET_MAX_STEER, NUM_STEER_COMMANDS), [0.0]])
@@ -207,7 +211,7 @@ def hybrid_a_star(
         path, cost = ret
         return Node(path, node.cost + cost, 0.0, node)
 
-    def traceback_path(node: Node, rspath: RSPath) -> npt.NDArray[np.floating[Any]]:
+    def traceback_path(node: Node) -> npt.NDArray[np.floating[Any]]:
         """
         Traceback the path from the goal to the start, to get the final trajectory
 
@@ -215,11 +219,13 @@ def hybrid_a_star(
         """
         segments = []
         while node is not None:
-            path: SimplePath = node.path
-            segments.append(np.hstack((path.trajectory, np.full_like(path.trajectory[:, :1], path.direction))))
+            path = node.path
+            if isinstance(path, SimplePath):
+                segments.append(np.hstack((path.trajectory, np.full_like(path.trajectory[:, :1], path.direction))))
+            else:
+                segments.append([[p.x, p.y, p.yaw, p.driving_direction] for p in path.waypoints()])
             node = node.parent
         segments.reverse()
-        segments.append([[p.x, p.y, p.yaw, p.driving_direction] for p in rspath.waypoints()])
         trajectory = np.vstack(segments)
         if trajectory.shape[0] > 1:
             trajectory[0, 3] = trajectory[1, 3]  # set the initial driving direction
@@ -237,7 +243,7 @@ def hybrid_a_star(
         if isinstance(cur.path, RSPath):
             if cancel_callback is not None and cancel_callback(cur):
                 return None  # canceled
-            return traceback_path(cur.parent, cur.path)
+            return traceback_path(cur)
 
         if cur.cost > dp[cur.path.ijk].cost:
             continue
@@ -246,6 +252,8 @@ def hybrid_a_star(
             return None  # canceled
 
         if (rsnode := generate_rspath(cur)) is not None:
+            if RETURN_RS_PATH_IMMEDIATELY:
+                return traceback_path(rsnode)
             heapq.heappush(pq, rsnode)
 
         for neighbour in generate_neighbours(cur):
