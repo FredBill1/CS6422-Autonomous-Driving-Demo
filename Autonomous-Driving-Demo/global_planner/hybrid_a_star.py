@@ -90,7 +90,7 @@ def hybrid_a_star(
 ) -> Optional[npt.NDArray[np.floating[Any]]]:
     assert start.shape == (3,) and goal.shape == (3,), "Start and goal must be a 1D array of shape (3)"
 
-    if Car(*start).check_collision(obstacles) or Car(*goal).check_collision(obstacles):
+    if Car(*goal).check_collision(obstacles):
         return None
 
     obstacle_grid = obstacles.downsampling_to_grid(
