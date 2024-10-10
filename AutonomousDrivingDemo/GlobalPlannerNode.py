@@ -1,60 +1,38 @@
 import multiprocessing as mp
+from multiprocessing.connection import Connection
 from typing import Any, Optional
 
 import matplotlib.colors as mcolors
 import numpy as np
 import numpy.typing as npt
 from matplotlib.collections import LineCollection
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtCore import QObject, Signal, Slot
 
 from .global_planner.hybrid_a_star import Node, hybrid_a_star
 from .modeling.Car import Car
 from .modeling.Obstacles import Obstacles
+from .utils.PipeRecvWorker import PipeRecvWorker
 
 
-def _worker_process(pipe: mp.SimpleQueue, cancel_event, segment_collection_size: int, *args) -> None:
+def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
     # use multiprocessing to bypass the GIL to prevent GUI freezes
-    display_segments: list[npt.NDArray[np.floating[Any]]] = []
+    while True:
+        data: Optional[tuple[Car, Car, Obstacles]] = pipe.recv()
+        if data is None:
+            continue
+        display_segments: list[npt.NDArray[np.floating[Any]]] = []
 
-    def callback(node: Node) -> bool:
-        display_segments.append(node.get_plot_trajectory())
-        if len(display_segments) < segment_collection_size:
-            return
-        if cancel_event.is_set():
-            return True
-        pipe.put(LineCollection(display_segments, colors=mcolors.TABLEAU_COLORS))
-        display_segments.clear()
-        return False
+        def callback(node: Node) -> bool:
+            display_segments.append(node.get_plot_trajectory())
+            if len(display_segments) < segment_collection_size:
+                return
+            if pipe.poll():
+                return True
+            pipe.send(LineCollection(display_segments, colors=mcolors.TABLEAU_COLORS))
+            display_segments.clear()
+            return False
 
-    path = hybrid_a_star(*args, callback)
-    pipe.put(path)
-
-
-class _GlobalPlannerNodeWorker(QThread):
-    result = Signal(np.ndarray, bool)
-    display_segments = Signal(LineCollection)
-
-    def __init__(self, *args, segment_collection_size: int, parent: Optional[QObject] = None) -> None:
-        super().__init__(parent)
-        self._args = args
-        self._segment_collection_size = segment_collection_size
-
-    def run(self) -> None:
-        pipe = mp.SimpleQueue()
-        cancel_event = mp.Event()
-        p = mp.Process(target=_worker_process, args=(pipe, cancel_event, self._segment_collection_size, *self._args))
-        p.start()
-        while True:
-            data = pipe.get()  # blocking
-            if not isinstance(data, LineCollection):
-                break
-            if self.isInterruptionRequested():
-                cancel_event.set()
-            else:
-                self.display_segments.emit(data)
-        p.join()
-        pipe.close()
-        self.result.emit(data, self.isInterruptionRequested())
+        pipe.send(hybrid_a_star(*data, callback))
 
 
 class GlobalPlannerNode(QObject):
@@ -64,30 +42,30 @@ class GlobalPlannerNode(QObject):
 
     def __init__(self, segment_collection_size: int, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self._worker: Optional[_GlobalPlannerNodeWorker] = None
-        self._segment_collection_size = segment_collection_size
+        self._parent_pipe, self._child_pipe = mp.Pipe()
+        self._worker = mp.Process(target=_worker_process, args=(self._child_pipe, segment_collection_size), daemon=True)
+        self._recv_worker = PipeRecvWorker(self._parent_pipe, parent=self)
+        self._recv_worker.recv.connect(self._worker_recv)
+
+        self._worker.start()
+        self._recv_worker.start()
 
     @Slot(Car, Car, Obstacles)
     def plan(self, start_state: Car, goal_state: Car, obstacles: Obstacles) -> None:
-        if self._worker is not None:
-            self._worker.requestInterruption()
-            self._worker.wait()
         start = np.array([start_state.x, start_state.y, start_state.yaw])
         goal = np.array([goal_state.x, goal_state.y, goal_state.yaw])
-        self._worker = _GlobalPlannerNodeWorker(
-            start, goal, obstacles, segment_collection_size=self._segment_collection_size, parent=self
-        )
-        self._worker.result.connect(self._on_worker_result)
-        self._worker.display_segments.connect(self.display_segments.emit)
-        self._worker.start()
+        self._parent_pipe.send((start, goal, obstacles))
 
     @Slot()
     def cancel(self) -> None:
-        if self._worker is not None:
-            self._worker.requestInterruption()
+        self._parent_pipe.send(None)
 
-    @Slot(np.ndarray, bool)
-    def _on_worker_result(self, trajectory: Optional[npt.NDArray[np.floating[Any]]], interrupted: bool) -> None:
-        if not interrupted:
+    @Slot(tuple)
+    def _worker_recv(self, data: None | LineCollection | npt.NDArray[np.floating[Any]]) -> None:
+        if data is None:
+            return
+        elif isinstance(data, LineCollection):
+            self.display_segments.emit(data)
+        else:
             self.finished.emit()
-            self.trajectory.emit(trajectory)
+            self.trajectory.emit(data)

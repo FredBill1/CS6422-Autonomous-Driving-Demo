@@ -1,4 +1,5 @@
 import multiprocessing as mp
+from multiprocessing.connection import Connection
 from typing import Any, Optional
 
 import numpy as np
@@ -9,7 +10,7 @@ from .local_planner.ModelPredictiveControl import ModelPredictiveControl, MPCRes
 from .modeling.Car import Car
 
 
-def _worker_process(pipe, delta_time_s: float) -> None:
+def _worker_process(pipe: Connection, delta_time_s: float) -> None:
     # use multiprocessing to bypass the GIL to prevent GUI freezes
     mpc: Optional[ModelPredictiveControl] = None
     while True:
