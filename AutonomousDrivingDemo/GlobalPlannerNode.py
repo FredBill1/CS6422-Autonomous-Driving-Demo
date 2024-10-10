@@ -21,18 +21,23 @@ def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
         if data is None:
             continue
         display_segments: list[npt.NDArray[np.floating[Any]]] = []
+        canceled = False
 
         def callback(node: Node) -> bool:
             display_segments.append(node.get_plot_trajectory())
             if len(display_segments) < segment_collection_size:
                 return
             if pipe.poll():
+                nonlocal canceled
+                canceled = True
                 return True
             pipe.send(LineCollection(display_segments, colors=mcolors.TABLEAU_COLORS))
             display_segments.clear()
             return False
 
-        pipe.send(hybrid_a_star(*data, callback))
+        trajectory = hybrid_a_star(*data, callback)
+        if not canceled:
+            pipe.send(trajectory)
 
 
 class GlobalPlannerNode(QObject):
@@ -60,11 +65,9 @@ class GlobalPlannerNode(QObject):
     def cancel(self) -> None:
         self._parent_pipe.send(None)
 
-    @Slot(tuple)
-    def _worker_recv(self, data: None | LineCollection | npt.NDArray[np.floating[Any]]) -> None:
-        if data is None:
-            return
-        elif isinstance(data, LineCollection):
+    @Slot(object)
+    def _worker_recv(self, data: LineCollection | Optional[npt.NDArray[np.floating[Any]]]) -> None:
+        if isinstance(data, LineCollection):
             self.display_segments.emit(data)
         else:
             self.finished.emit()
