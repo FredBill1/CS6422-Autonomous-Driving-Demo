@@ -1,7 +1,7 @@
 import heapq
 from collections.abc import Callable, Generator
 from itertools import product
-from typing import Any, Literal, NamedTuple, Optional, Protocol
+from typing import Any, Literal, NamedTuple, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -10,6 +10,7 @@ from rsplan.planner import _solve_path as solve_rspath
 
 from ..modeling.Car import Car
 from ..modeling.Obstacles import ObstacleGrid, Obstacles
+from ..utils.SupportsBool import SupportsBool
 from ..utils.wrap_angle import wrap_angle
 
 XY_GRID_RESOLUTION = 1.0  # [m]
@@ -35,6 +36,7 @@ MOVEMENTS = tuple((di, dj, np.sqrt(di**2 + dj**2)) for di in (-1, 0, 1) for dj i
 
 
 def _distance_heuristic(grid: ObstacleGrid, goal_xy: npt.ArrayLike) -> ObstacleGrid:
+    "Dijkstra's algorithm to calculate the distance from each grid cell to the goal"
     H, W = grid.grid.shape
     dist = np.full((H, W), H_COLLISION_COST)
     ij = grid.calc_index(goal_xy)
@@ -79,10 +81,6 @@ class Node(NamedTuple):
         return trajectory
 
 
-class SupportsBool(Protocol):
-    def __bool__(self) -> bool: ...
-
-
 def hybrid_a_star(
     start: npt.NDArray[np.floating[Any]],
     goal: npt.NDArray[np.floating[Any]],
@@ -103,14 +101,21 @@ def hybrid_a_star(
     heuristic_grid = _distance_heuristic(obstacle_grid, goal[:2])
     N, M = heuristic_grid.grid.shape
     K = int(2 * np.pi / YAW_GRID_RESOLUTION)
-    dp = np.full((N, M, K), None, dtype=Node)  # used to record the path and cost for each grid cell
+    # Used to record the path and cost for each grid cell at A* search stage,
+    # where dp[y][x][yaw] is the Node object for the grid cell (x, y) with yaw angle yaw
+    dp = np.full((N, M, K), None, dtype=Node)
 
     def calc_ijk(x: float, y: float, yaw: float) -> tuple[int, int, int]:
+        "[x, y, yaw] -> [i, j, k] for dp"
         i, j = heuristic_grid.calc_index([x, y])
         k = int(wrap_angle(yaw, zero_to_2pi=True) // YAW_GRID_RESOLUTION)
         return i, j, k
 
     def generate_neighbour(cur: Node, direction: int, steer: float) -> Optional[Node]:
+        "Generate a neighbour node of the current node, given the direction and steer angle"
+
+        # Simulate the car movement for MOTION_DISTANCE, with a interval of MOTION_RESOLUTION,
+        # check if the car will collide with the obstacles during the movement
         car = Car(*cur.path.trajectory[-1], velocity=float(direction), steer=steer)
         trajectory = []
         for _ in range(int(MOTION_DISTANCE / MOTION_RESOLUTION)):
@@ -124,6 +129,7 @@ def hybrid_a_star(
             print(f"Out of grid, please add more obstacles to fill the boundary: {i=} {j=}")
             return None
 
+        # calculate the cost from the start to this neighbour node
         distance_cost = MOTION_DISTANCE if direction == 1 else MOTION_DISTANCE * BACKWARDS_COST
         switch_direction_cost = (
             SWITCH_DIRECTION_COST if cur.path.direction != 0 and direction != cur.path.direction else 0.0
@@ -132,6 +138,7 @@ def hybrid_a_star(
         steer_cost = STEER_COST * np.abs(steer) * MOTION_DISTANCE
         cost = cur.cost + distance_cost + switch_direction_cost + steer_change_cost + steer_cost
 
+        # calculate the heuristic cost from this neighbour node to the goal
         h_dist_cost = H_DIST_COST * heuristic_grid.grid[i, j]
         h_yaw_cost = H_YAW_COST * np.abs(wrap_angle(goal[2] - car.yaw))
         h_cost = h_dist_cost + h_yaw_cost
@@ -139,11 +146,18 @@ def hybrid_a_star(
         return Node(SimplePath((i, j, k), np.array(trajectory), direction, steer), cost, h_cost, cur)
 
     def generate_neighbours(cur: Node) -> Generator[Node, None, None]:
+        "Generate all possible neighbours of the current node"
         for direction, steer in product([1, -1], STEER_COMMANDS):
             if (res := generate_neighbour(cur, direction, steer)) is not None:
                 yield res
 
     def generate_rspath(node: Node) -> Optional[Node]:
+        """
+        Try to generate a Path from the current node directly to the goal using Reeds-Shepp curves,
+        which will speed up the search process when the node is close to the goal and heuristics
+        are not enough to guide the search.
+        """
+
         def check(path: RSPath) -> bool:
             for x, y, yaw in zip(*path.coordinates_tuple()):
                 if Car(x, y, yaw).check_collision(obstacles):
@@ -170,18 +184,29 @@ def hybrid_a_star(
                 steer_cost += STEER_COST * np.abs(steer) * length
             return distance_cost + switch_direction_cost + steer_change_cost + steer_cost
 
+        # generate all possible Reeds-Shepp pathes
         pathes = solve_rspath(
             tuple(node.path.trajectory[-1]), tuple(goal), Car.TARGET_MIN_TURNING_RADIUS, MOTION_RESOLUTION
         )
+
+        # filter out the pathes that collide with the obstacles
         pathes = filter(check, pathes)
+
+        # calculate the cost of each path
         pathes = ((path, calc_rspath_cost(path)) for path in pathes)
+
+        # return the path with the minimum cost
         if (ret := min(pathes, key=lambda t: t[1], default=None)) is None:
             return None
         path, cost = ret
         return Node(path, node.cost + cost, 0.0, node)
 
     def traceback_path(node: Node, rspath: RSPath) -> npt.NDArray[np.floating[Any]]:
-        # returns [[x(m), y(m), yaw(rad), direction(1, -1)]]
+        """
+        Traceback the path from the goal to the start, to get the final trajectory
+
+        returns [[x(m), y(m), yaw(rad), direction(1, -1)]]
+        """
         segments = []
         while node is not None:
             path: SimplePath = node.path
@@ -194,6 +219,7 @@ def hybrid_a_star(
             trajectory[0, 3] = trajectory[1, 3]  # set the initial driving direction
         return trajectory
 
+    # start the A* search
     start_ijk = calc_ijk(*start)
     start_node = Node(
         SimplePath(start_ijk, np.array([start]), 0, 0.0), 0.0, H_DIST_COST * heuristic_grid.grid[start_ijk[:2]], None
