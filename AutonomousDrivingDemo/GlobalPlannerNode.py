@@ -70,5 +70,6 @@ class GlobalPlannerNode(QObject):
         if isinstance(data, LineCollection):
             self.display_segments.emit(data)
         else:
-            self.finished.emit()
             self.trajectory.emit(data)
+            if data is not None:
+                self.finished.emit()
