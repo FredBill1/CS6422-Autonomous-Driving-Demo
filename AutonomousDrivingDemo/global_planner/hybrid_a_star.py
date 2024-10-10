@@ -96,15 +96,16 @@ def hybrid_a_star(
     if Car(*goal).check_collision(obstacles):
         return None
 
-    # downsample the obstacle map to a grid
+    # Downsample the obstacle map to a grid
     obstacle_grid = obstacles.downsampling_to_grid(
         XY_GRID_RESOLUTION, min(Car.COLLISION_LENGTH, Car.COLLISION_WIDTH) / 2
     )
 
-    # precompute the distance to the goal for each grid cell, where the distance will be used as a heuristic
+    # Precompute the distance to the goal from each grid cell, where the distance will be used as a heuristic
     heuristic_grid = _distance_heuristic(obstacle_grid, goal[:2])
     N, M = heuristic_grid.grid.shape
     K = int(2 * np.pi / YAW_GRID_RESOLUTION)
+
     # Used to record the path and cost for each grid cell at A* search stage,
     # where dp[y][x][yaw] is the Node object for the grid cell (x, y) with yaw angle yaw
     dp = np.full((N, M, K), None, dtype=Node)
@@ -133,7 +134,7 @@ def hybrid_a_star(
             print(f"Out of grid, please add more obstacles to fill the boundary: {i=} {j=}")
             return None
 
-        # calculate the cost from the start to this neighbour node
+        # Calculate the cost from the start to this neighbour node
         distance_cost = MOTION_DISTANCE if direction == 1 else MOTION_DISTANCE * BACKWARDS_COST
         switch_direction_cost = (
             SWITCH_DIRECTION_COST if cur.path.direction != 0 and direction != cur.path.direction else 0.0
@@ -142,7 +143,7 @@ def hybrid_a_star(
         steer_cost = STEER_COST * np.abs(steer) * MOTION_DISTANCE
         cost = cur.cost + distance_cost + switch_direction_cost + steer_change_cost + steer_cost
 
-        # calculate the heuristic cost from this neighbour node to the goal
+        # Calculate the heuristic cost from this neighbour node to the goal
         h_dist_cost = H_DIST_COST * heuristic_grid.grid[i, j]
         h_yaw_cost = H_YAW_COST * np.abs(wrap_angle(goal[2] - car.yaw))
         h_cost = h_dist_cost + h_yaw_cost
