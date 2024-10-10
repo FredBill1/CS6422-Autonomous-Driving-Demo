@@ -13,6 +13,7 @@ from .modeling.Obstacles import Obstacles
 
 
 def _worker_process(pipe: mp.SimpleQueue, cancel_event, segment_collection_size: int, *args) -> None:
+    # use multiprocessing to bypass the GIL to prevent GUI freezes
     display_segments: list[npt.NDArray[np.floating[Any]]] = []
 
     def callback(node: Node) -> bool:
@@ -39,7 +40,6 @@ class _GlobalPlannerNodeWorker(QThread):
         self._segment_collection_size = segment_collection_size
 
     def run(self) -> None:
-        # use multiprocessing to bypass the GIL to prevent GUI freezes
         pipe = mp.SimpleQueue()
         cancel_event = mp.Event()
         p = mp.Process(target=_worker_process, args=(pipe, cancel_event, self._segment_collection_size, *self._args))
@@ -58,6 +58,7 @@ class _GlobalPlannerNodeWorker(QThread):
 
 
 class GlobalPlannerNode(QObject):
+    finished = Signal()
     trajectory = Signal(np.ndarray)
     display_segments = Signal(LineCollection)
 
@@ -88,4 +89,5 @@ class GlobalPlannerNode(QObject):
     @Slot(np.ndarray, bool)
     def _on_worker_result(self, trajectory: Optional[npt.NDArray[np.floating[Any]]], interrupted: bool) -> None:
         if not interrupted:
+            self.finished.emit()
             self.trajectory.emit(trajectory)

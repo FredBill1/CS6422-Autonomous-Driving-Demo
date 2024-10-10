@@ -92,9 +92,21 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Autonomous Driving Demo", None))
-        self.set_goal_button.setText(QCoreApplication.translate("MainWindow", u"Set Goal", None))
-        self.set_pose_button.setText(QCoreApplication.translate("MainWindow", u"Set Pose", None))
-        self.navigate_button.setText(QCoreApplication.translate("MainWindow", u"Navigate", None))
-        self.cancel_button.setText(QCoreApplication.translate("MainWindow", u"Cancel", None))
+        self.set_goal_button.setText(QCoreApplication.translate("MainWindow", u"Set Goal(A)", None))
+#if QT_CONFIG(shortcut)
+        self.set_goal_button.setShortcut(QCoreApplication.translate("MainWindow", u"A", None))
+#endif // QT_CONFIG(shortcut)
+        self.set_pose_button.setText(QCoreApplication.translate("MainWindow", u"Set Pose(S)", None))
+#if QT_CONFIG(shortcut)
+        self.set_pose_button.setShortcut(QCoreApplication.translate("MainWindow", u"S", None))
+#endif // QT_CONFIG(shortcut)
+        self.navigate_button.setText(QCoreApplication.translate("MainWindow", u"Navigate(D)", None))
+#if QT_CONFIG(shortcut)
+        self.navigate_button.setShortcut(QCoreApplication.translate("MainWindow", u"D", None))
+#endif // QT_CONFIG(shortcut)
+        self.cancel_button.setText(QCoreApplication.translate("MainWindow", u"Cancel(F)", None))
+#if QT_CONFIG(shortcut)
+        self.cancel_button.setShortcut(QCoreApplication.translate("MainWindow", u"F", None))
+#endif // QT_CONFIG(shortcut)
     # retranslateUi
 

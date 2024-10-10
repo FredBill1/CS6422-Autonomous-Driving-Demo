@@ -19,10 +19,10 @@ MOTION_DISTANCE = XY_GRID_RESOLUTION * 1.5  # [m] path interpolate distance
 NUM_STEER_COMMANDS = 20  # number of steer command
 
 SWITCH_DIRECTION_COST = 25.0  # switch direction cost
-BACKWARDS_COST = 5.0  # backward penalty cost
+BACKWARDS_COST = 4.0  # backward penalty cost
 STEER_CHANGE_COST = 3.0  # steer angle change cost
 STEER_COST = 3.0  # steer angle cost
-H_COST = 4.0  # Heuristic cost
+H_COST = 2.0  # Heuristic cost
 H_COLLISION_COST = 1e4  # collision cost when calculating heuristic
 
 STEER_COMMANDS = np.unique(

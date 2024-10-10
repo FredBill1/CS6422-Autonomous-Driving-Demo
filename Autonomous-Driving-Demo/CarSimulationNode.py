@@ -14,15 +14,16 @@ class CarSimulationNode(QObject):
         initial_state: Car,
         control: tuple[float, float],
         delta_time_s: float,
-        simulation_delta_time_s: float,
+        simulation_interval_s: float,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
         self._real_state = initial_state
         self._control = control
         self._delta_time_s = delta_time_s
-        self._simulation_delta_time_s = simulation_delta_time_s
+        self._simulation_interval_s = simulation_interval_s
         self._timestamp_s = 0.0
+        self._stopped = True
 
     @Slot()
     def _simulate(self):
@@ -35,10 +36,12 @@ class CarSimulationNode(QObject):
         self._simulation_timer = QTimer(self)
         self._simulation_timer.timeout.connect(self._simulate)
         self._simulation_timer.setTimerType(Qt.TimerType.PreciseTimer)
-        self._simulation_timer.start(int(self._simulation_delta_time_s * 1000))
+        self._simulation_timer.start(int(self._simulation_interval_s * 1000))
 
     @Slot(tuple)
     def set_control(self, control: tuple[float, float]) -> None:
+        if self._stopped:
+            return
         self._control = control
 
     @Slot(Car)
@@ -46,6 +49,11 @@ class CarSimulationNode(QObject):
         self._real_state = state.copy()
 
     @Slot()
-    def cancel(self):
+    def stop(self) -> None:
         self._real_state.velocity = self._real_state.steer = 0.0
         self._control = (0.0, 0.0)
+        self._stopped = True
+
+    @Slot()
+    def resume(self) -> None:
+        self._stopped = False
