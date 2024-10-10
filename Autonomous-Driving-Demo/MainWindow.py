@@ -28,9 +28,15 @@ from .modeling.Obstacles import Obstacles
 from .ui.mainwindow_ui import Ui_MainWindow
 
 GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE = 50
+
 DASHBOARD_HISTORY_SIZE = 100
-DELTA_TIME = 0.1
-SIMULATION_INTERVAL = 0.2
+SIMULATION_DELTA_TIME = 0.01
+SIMULATION_INTERVAL = 0.02
+SIMULATION_PUBLISH_INTERVAL = 0.2
+SIMULATION_PUBLISH_DELTA_TIME = SIMULATION_DELTA_TIME * SIMULATION_PUBLISH_INTERVAL / SIMULATION_INTERVAL
+
+LOCAL_PLANNER_DELTA_TIME = 0.1
+
 CANVAS_ANIMATION_INTERVAL = 0.2
 DASHBOARD_ANIMATION_INTERVAL = 0.2
 
@@ -128,8 +134,9 @@ class MainWindow(QMainWindow):
         self._car_simulation_node = CarSimulationNode(
             initial_state=self._measured_state.copy(),
             control=(0.0, 0.0),
-            delta_time_s=DELTA_TIME,
+            delta_time_s=SIMULATION_DELTA_TIME,
             simulation_interval_s=SIMULATION_INTERVAL,
+            simulation_publish_interval_s=SIMULATION_PUBLISH_INTERVAL,
         )
         self._car_simulation_thread = QThread(self)
         self._car_simulation_node.moveToThread(self._car_simulation_thread)
@@ -155,7 +162,7 @@ class MainWindow(QMainWindow):
         )
 
         # Local Planner Node
-        self._local_planner_node = LocalPlannerNode(delta_time_s=DELTA_TIME)
+        self._local_planner_node = LocalPlannerNode(delta_time_s=LOCAL_PLANNER_DELTA_TIME)
         self._local_planner_thread = QThread(self)
         self._local_planner_node.moveToThread(self._local_planner_thread)
         self._global_planner_node.trajectory.connect(self._local_planner_node.set_trajectory)
@@ -242,7 +249,10 @@ class MainWindow(QMainWindow):
 
     def _update_dashboard_figure(self, *_) -> None:
         state = self._measured_state
-        xlim = (self._measured_timestamps[0], max(self._measured_timestamps[-1], DASHBOARD_HISTORY_SIZE * DELTA_TIME))
+        xlim = (
+            self._measured_timestamps[0],
+            max(self._measured_timestamps[-1], DASHBOARD_HISTORY_SIZE * SIMULATION_PUBLISH_DELTA_TIME),
+        )
         self._measured_velocities_artist.set_data(self._measured_timestamps, self._measured_velocities)
         self._measured_velocity_ax.set_xlim(*xlim)
         self._measured_velocity_ax.set_title(f"Velocity {state.velocity*3.6:.1f}km/h")

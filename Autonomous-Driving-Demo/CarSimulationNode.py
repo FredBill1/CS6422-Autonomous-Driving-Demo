@@ -15,6 +15,7 @@ class CarSimulationNode(QObject):
         control: tuple[float, float],
         delta_time_s: float,
         simulation_interval_s: float,
+        simulation_publish_interval_s: float,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
@@ -22,6 +23,7 @@ class CarSimulationNode(QObject):
         self._control = control
         self._delta_time_s = delta_time_s
         self._simulation_interval_s = simulation_interval_s
+        self._simulation_publish_interval_s = simulation_publish_interval_s
         self._timestamp_s = 0.0
         self._stopped = True
 
@@ -29,6 +31,9 @@ class CarSimulationNode(QObject):
     def _simulate(self):
         self._real_state.update_with_control(*self._control, self._delta_time_s)
         self._timestamp_s += self._delta_time_s
+
+    @Slot()
+    def _publish_state(self):
         self.measured_state.emit(self._timestamp_s, self._real_state.copy())
 
     @Slot()
@@ -37,6 +42,11 @@ class CarSimulationNode(QObject):
         self._simulation_timer.timeout.connect(self._simulate)
         self._simulation_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._simulation_timer.start(int(self._simulation_interval_s * 1000))
+
+        self._simulation_publish_timer = QTimer(self)
+        self._simulation_publish_timer.timeout.connect(self._publish_state)
+        self._simulation_publish_timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self._simulation_publish_timer.start(int(self._simulation_publish_interval_s * 1000))
 
     @Slot(tuple)
     def set_control(self, control: tuple[float, float]) -> None:
