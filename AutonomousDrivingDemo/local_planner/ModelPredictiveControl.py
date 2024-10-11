@@ -20,9 +20,9 @@ DU_TH = 0.1  # iteration finish param
 
 
 # mpc parameters
-R = np.diag([0.01, 0.01])  # input cost matrix
+R = np.diag([0.01, 0.005])  # input cost matrix
 R_D = np.diag([0.01, 1.0])  # input difference cost matrix
-Q = np.diag([1.0, 1.0, 0.5, 1.1])  # state cost matrix
+Q = np.diag([1.1, 1.1, 0.05, 1.1])  # state cost matrix
 Q_F = Q * 2  # state final matrix
 
 NX = 4  # [x, y, v, yaw]
@@ -148,14 +148,17 @@ class ModelPredictiveControl:
         assert ref_trajectory.shape[1] == 4, "Reference trajectory have [[x, y, yaw, direction], ...]"
         self._ref_trajectory = ref_trajectory
         self._ref_trajectory[:, 2] = smooth_yaw(self._ref_trajectory[:, 2])
+        v = self._ref_trajectory[:, 3]
+        N = len(v)
+
+        # make the target velocity at each direction changing point of the trajectory to be 0
+        v[1:] = np.where(v[1:] != v[:-1], 0.0, v[1:])
 
         # make the target velocity at each point of the trajectory to be TARGET_SPEED
-        self._ref_trajectory[:, 3] *= Car.TARGET_SPEED
+        v *= Car.TARGET_SPEED
 
         # let the last few points of the trajectory to have zero velocity, to make the vehicle stop at the goal
-        N = self._ref_trajectory.shape[0]
-        for i in range(min(N, np.ceil(GOAL_MAX_DISTANCE / COURSE_TICK / 2).astype(int))):
-            self._ref_trajectory[N - 1 - i, 3] = 0.0
+        v[-min(N, np.ceil(GOAL_MAX_DISTANCE / COURSE_TICK / 2).astype(int)) :] = 0.0
 
     def _nearist_point_index(self, state: Car) -> int:
         ref_xy = self._ref_trajectory[:NEARIST_POINT_SEARCH_COUNT, :2]
