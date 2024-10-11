@@ -154,7 +154,7 @@ class ModelPredictiveControl:
 
         # let the last few points of the trajectory to have zero velocity, to make the vehicle stop at the goal
         N = self._ref_trajectory.shape[0]
-        for i in range(min(N, round(GOAL_MAX_DISTANCE / COURSE_TICK))):
+        for i in range(min(N, np.ceil(GOAL_MAX_DISTANCE / COURSE_TICK / 2).astype(int))):
             self._ref_trajectory[N - 1 - i, 3] = 0.0
 
     def _nearist_point_index(self, state: Car) -> int:

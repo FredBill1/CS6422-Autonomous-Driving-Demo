@@ -28,8 +28,8 @@ class Car:
 
     BACK_TO_CENTER = LENGTH / 2 - BACK_TO_WHEEL  # [m]
 
-    COLLISION_LENGTH = LENGTH + 0.5  # [m]
-    COLLISION_WIDTH = WIDTH + 0.5  # [m]
+    COLLISION_LENGTH = LENGTH + 1.0  # [m]
+    COLLISION_WIDTH = WIDTH + 1.0  # [m]
     COLLISION_RADIUS = np.hypot(COLLISION_WIDTH / 2, COLLISION_LENGTH / 2)  # [m]
 
     MAX_STEER = np.deg2rad(40.0)  # [rad]
