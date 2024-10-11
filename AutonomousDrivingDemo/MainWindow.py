@@ -49,29 +49,29 @@ MAP_NUM_RANDOM_OBSTACLES = 40
 def _get_test_obstacles() -> Obstacles:
     ox = [
         np.arange(0, MAP_WIDTH, MAP_STEP),
-        np.full(int(MAP_HEIGHT / MAP_STEP), MAP_WIDTH),
+        np.full(np.ceil(MAP_HEIGHT / MAP_STEP).astype(int), MAP_WIDTH),
         np.arange(0, MAP_WIDTH + MAP_STEP, MAP_STEP),
-        np.full(int(MAP_HEIGHT / MAP_STEP) + 1, 0.0),
-        np.full(int(40 / MAP_STEP), MAP_WIDTH / 3),
-        np.full(int(40 / MAP_STEP), 2 * MAP_WIDTH / 3),
+        np.full(np.ceil(MAP_HEIGHT / MAP_STEP).astype(int) + 1, 0.0),
+        np.full(np.ceil(MAP_WIDTH / 3 * 2 / MAP_STEP).astype(int), MAP_WIDTH / 3),
+        np.full(np.ceil(MAP_HEIGHT / 3 * 2 / MAP_STEP).astype(int), 2 * MAP_WIDTH / 3),
         np.random.uniform(0, MAP_WIDTH, MAP_NUM_RANDOM_OBSTACLES),
     ]
     oy = [
-        np.full(int(MAP_WIDTH / MAP_STEP), 0.0),
+        np.full(np.ceil(MAP_WIDTH / MAP_STEP).astype(int), 0.0),
         np.arange(0, MAP_HEIGHT, MAP_STEP),
-        np.full(int((MAP_WIDTH + MAP_STEP) / MAP_STEP), MAP_HEIGHT),
+        np.full(np.ceil((MAP_WIDTH + MAP_STEP) / MAP_STEP).astype(int), MAP_HEIGHT),
         np.arange(0, MAP_HEIGHT + MAP_STEP, MAP_STEP),
-        np.arange(0, 40, MAP_STEP),
-        MAP_HEIGHT - np.arange(0, 40, MAP_STEP),
+        np.arange(0, MAP_WIDTH / 3 * 2, MAP_STEP),
+        MAP_HEIGHT - np.arange(0, MAP_HEIGHT / 3 * 2, MAP_STEP),
         np.random.uniform(0, MAP_HEIGHT, MAP_NUM_RANDOM_OBSTACLES),
     ]
     return Obstacles(np.vstack((np.concatenate(ox), np.concatenate(oy))).T)
 
 
 def _get_random_car(obstacles: Obstacles) -> Car:
-    state = np.random.uniform((5, 5, -np.pi), (55, 55, np.pi))
+    state = np.random.uniform((0, 0, -np.pi), (MAP_WIDTH, MAP_HEIGHT, np.pi))
     while Car(*state).check_collision(obstacles):
-        state = np.random.uniform((5, 5, -np.pi), (55, 55, np.pi))
+        state = np.random.uniform((0, 0, -np.pi), (MAP_WIDTH, MAP_HEIGHT, np.pi))
     return Car(*state)
 
 
@@ -121,7 +121,7 @@ class MainWindow(QMainWindow):
         self._measured_steers_artist = self._measured_steer_ax.plot([], [], "-r")[0]
         self._measured_steer_ax.set_ylim(-np.rad2deg(Car.MAX_STEER) - 5.0, np.rad2deg(Car.MAX_STEER) + 5.0)
         self._measured_state_artists = self._measured_state.plot(ax=self._visualization_ax)
-        self._obstacles_artists = self._visualization_ax.plot(*self._obstacles.coordinates.T, ".r")
+        self._obstacles_artists = self._visualization_ax.plot(*self._obstacles.coordinates.T, ".r", rasterized=True)
         self._pressed_position_artists: list[plt.Line2D] = []
         self._global_planner_segments_collections: list[LineCollection] = []
         self._trajectory_artist: plt.Line2D = self._visualization_ax.plot([], [], "-b")[0]
@@ -180,6 +180,7 @@ class MainWindow(QMainWindow):
         self._ax_func_animation = FuncAnimation(
             self._visualization_canvas.figure,
             self._update_visualization_figure,
+            init_func=lambda: self._visualization_ax.autoscale_view(tight=True),
             interval=int(CANVAS_ANIMATION_INTERVAL * 1000),
             save_count=0,
         )
