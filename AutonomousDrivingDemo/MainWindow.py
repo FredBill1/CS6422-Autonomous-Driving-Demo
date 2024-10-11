@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
         self._visualization_canvas.mpl_connect("button_release_event", self._canvas_on_release)
         self._visualization_canvas.mpl_connect("motion_notify_event", self._canvas_on_move)
 
-        # Declare nodes
+        # declare nodes
         self._car_simulation_node = CarSimulationNode(
             initial_state=self._measured_state.copy(),
             control=(0.0, 0.0),
@@ -155,7 +155,7 @@ class MainWindow(QMainWindow):
             update_interval_s=LOCAL_PLANNER_UPDATE_INTERVAL,
         )
 
-        # Connect signals
+        # connect signals
         self._car_simulation_node.measured_state.connect(self._local_planner_node.set_state)
         self._car_simulation_node.measured_state.connect(self._update_measured_state)
         self._global_planner_node.display_segments.connect(self._update_global_planner_display_segments)
@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
         self.set_goal.connect(self._global_planner_node.plan)
         self.set_state.connect(self._car_simulation_node.set_state)
 
-        # Start tasks and nodes
+        # start tasks and nodes
         self._ax_func_animation = FuncAnimation(
             self._visualization_canvas.figure,
             self._update_visualization_figure,
