@@ -197,5 +197,5 @@ class ModelPredictiveControl:
             if du < DU_TH:
                 break
         else:
-            print("Error: Cannot converge mpc")
+            print("Warning: Cannot converge mpc")
         return MPCResult(controls, states[:, [0, 1, 3, 2]], xref[:, [0, 1, 3, 2]], self._goal_reached(state))
