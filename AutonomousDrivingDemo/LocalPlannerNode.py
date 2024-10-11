@@ -21,20 +21,21 @@ def _worker_process(pipe: Connection, delta_time_s: float) -> None:
             mpc = None
         elif isinstance(data, np.ndarray):
             mpc = ModelPredictiveControl(data)
-        elif isinstance(data, Car):
+        else:
             if pipe.poll():  # discard outdated data
                 continue
-            pipe.send(None if mpc is None else (data, mpc.update(data, delta_time_s)))
+            timestamp_s, state = data
+            pipe.send(None if mpc is None else (timestamp_s, state, mpc.update(state, delta_time_s)))
 
 
 class LocalPlannerNode(QObject):
-    control = Signal(tuple)
+    control_sequence = Signal(tuple)
     local_trajectory = Signal(np.ndarray)
     reference_points = Signal(np.ndarray)
 
     def __init__(self, delta_time_s: float, update_interval_s: float, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self._state: Optional[Car] = None
+        self._state: Optional[tuple[float, Car]] = None
         self._delta_time_s = delta_time_s
         self._parent_pipe, self._child_pipe = mp.Pipe()
         self._worker = mp.Process(target=_worker_process, args=(self._child_pipe, delta_time_s), daemon=True)
@@ -55,7 +56,7 @@ class LocalPlannerNode(QObject):
 
     @Slot(float, Car)
     def set_state(self, timestamp_s: float, state: Car) -> None:
-        self._state = state
+        self._state = (timestamp_s, state)
 
     @Slot(np.ndarray)
     def set_trajectory(self, trajectory: npt.NDArray[np.floating[Any]]) -> None:
@@ -71,12 +72,14 @@ class LocalPlannerNode(QObject):
             self._parent_pipe.send(self._state)
 
     @Slot(tuple)
-    def _worker_recv(self, data: Optional[tuple[Car, MPCResult]]) -> None:
+    def _worker_recv(self, data: Optional[tuple[float, Car, MPCResult]]) -> None:
         if data is None:
             return
-        state, result = data
-        acceleration, steer = result.controls[1]
-        control = (state.velocity + acceleration * self._delta_time_s, steer)
-        self.control.emit(control)
+        timestamp_s, state, result = data
+        timestamps = np.arange(len(result.controls)) * self._delta_time_s + timestamp_s
+        velocities = state.velocity + np.cumsum(result.controls[:, 0] * self._delta_time_s)
+        steers = result.controls[:, 1]
+        control_sequence = np.column_stack((timestamps, velocities, steers))
+        self.control_sequence.emit(control_sequence)
         self.local_trajectory.emit(result.states[:, :2])
         self.reference_points.emit(result.ref_states[:, :2])

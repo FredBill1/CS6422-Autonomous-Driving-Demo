@@ -142,7 +142,6 @@ class MainWindow(QMainWindow):
         # declare nodes
         self._car_simulation_node = CarSimulationNode(
             initial_state=self._measured_state.copy(),
-            control=(0.0, 0.0),
             delta_time_s=SIMULATION_DELTA_TIME,
             simulation_interval_s=SIMULATION_INTERVAL,
             simulation_publish_interval_s=SIMULATION_PUBLISH_INTERVAL,
@@ -162,7 +161,7 @@ class MainWindow(QMainWindow):
         self._global_planner_node.finished.connect(self._car_simulation_node.resume)
         self._global_planner_node.trajectory.connect(self._local_planner_node.set_trajectory)
         self._global_planner_node.trajectory.connect(self._update_trajectory)
-        self._local_planner_node.control.connect(self._car_simulation_node.set_control)
+        self._local_planner_node.control_sequence.connect(self._car_simulation_node.set_control_sequence)
         self._local_planner_node.local_trajectory.connect(self._update_local_trajectory)
         self._local_planner_node.reference_points.connect(self._update_reference_points)
         self.canceled.connect(self._car_simulation_node.stop)

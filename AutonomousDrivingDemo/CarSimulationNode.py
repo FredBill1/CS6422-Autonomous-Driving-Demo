@@ -4,6 +4,10 @@ from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
 
 from .modeling.Car import Car
 
+import numpy.typing as npt
+import numpy as np
+from typing import Any
+
 
 class CarSimulationNode(QObject):
 
@@ -12,7 +16,6 @@ class CarSimulationNode(QObject):
     def __init__(
         self,
         initial_state: Car,
-        control: tuple[float, float],
         delta_time_s: float,
         simulation_interval_s: float,
         simulation_publish_interval_s: float,
@@ -20,7 +23,7 @@ class CarSimulationNode(QObject):
     ) -> None:
         super().__init__(parent)
         self._real_state = initial_state
-        self._control = control
+        self._control_sequence: Optional[npt.NDArray[np.floating[Any]]] = None  # [[timestamp, velocity, steer], ...]
         self._delta_time_s = delta_time_s
         self._timestamp_s = 0.0
         self._stopped = True
@@ -37,8 +40,14 @@ class CarSimulationNode(QObject):
 
     @Slot()
     def _simulate(self):
-        self._real_state.update_with_control(*self._control, self._delta_time_s)
         self._timestamp_s += self._delta_time_s
+        if self._control_sequence is None:
+            self._real_state.update(self._delta_time_s)
+            return
+        timestamps = self._control_sequence[:, 0]
+        i = np.argmin(np.abs(timestamps - self._timestamp_s))
+        control = self._control_sequence[i, 1:]
+        self._real_state.update_with_control(*control, self._delta_time_s)
 
     @Slot()
     def _publish_state(self):
@@ -49,11 +58,11 @@ class CarSimulationNode(QObject):
         self._simulation_timer.start()
         self._simulation_publish_timer.start()
 
-    @Slot(tuple)
-    def set_control(self, control: tuple[float, float]) -> None:
+    @Slot(np.ndarray)
+    def set_control_sequence(self, control_sequence: npt.NDArray[Any]) -> None:
         if self._stopped:
             return
-        self._control = control
+        self._control_sequence = control_sequence
 
     @Slot(Car)
     def set_state(self, state: Car) -> None:
@@ -62,7 +71,7 @@ class CarSimulationNode(QObject):
     @Slot()
     def stop(self) -> None:
         self._real_state.velocity = self._real_state.steer = 0.0
-        self._control = (0.0, 0.0)
+        self._control_sequence = None
         self._stopped = True
 
     @Slot()
