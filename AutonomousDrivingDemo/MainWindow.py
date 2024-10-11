@@ -40,32 +40,32 @@ LOCAL_PLANNER_DELTA_TIME = 0.1
 CANVAS_ANIMATION_INTERVAL = 0.2
 DASHBOARD_ANIMATION_INTERVAL = 0.2
 
+MAP_WIDTH = 60.0
+MAP_HEIGHT = 60.0
+MAP_STEP = 1.0
+MAP_NUM_RANDOM_OBSTACLES = 40
+
 
 def _get_test_obstacles() -> Obstacles:
-    ox, oy = [], []
-    for i in range(60):
-        ox.append(i)
-        oy.append(0.0)
-    for i in range(60):
-        ox.append(60.0)
-        oy.append(i)
-    for i in range(61):
-        ox.append(i)
-        oy.append(60.0)
-    for i in range(61):
-        ox.append(0.0)
-        oy.append(i)
-    for i in range(40):
-        ox.append(20.0)
-        oy.append(i)
-    for i in range(40):
-        ox.append(40.0)
-        oy.append(60.0 - i)
-    for _ in range(20):
-        ox.append(np.random.uniform(0, 60))
-        oy.append(np.random.uniform(0, 60))
-
-    return Obstacles(np.vstack((ox, oy)).T)
+    ox = [
+        np.arange(0, MAP_WIDTH, MAP_STEP),
+        np.full(int(MAP_HEIGHT / MAP_STEP), MAP_WIDTH),
+        np.arange(0, MAP_WIDTH + MAP_STEP, MAP_STEP),
+        np.full(int(MAP_HEIGHT / MAP_STEP) + 1, 0.0),
+        np.full(int(40 / MAP_STEP), MAP_WIDTH / 3),
+        np.full(int(40 / MAP_STEP), 2 * MAP_WIDTH / 3),
+        np.random.uniform(0, MAP_WIDTH, MAP_NUM_RANDOM_OBSTACLES),
+    ]
+    oy = [
+        np.full(int(MAP_WIDTH / MAP_STEP), 0.0),
+        np.arange(0, MAP_HEIGHT, MAP_STEP),
+        np.full(int((MAP_WIDTH + MAP_STEP) / MAP_STEP), MAP_HEIGHT),
+        np.arange(0, MAP_HEIGHT + MAP_STEP, MAP_STEP),
+        np.arange(0, 40, MAP_STEP),
+        MAP_HEIGHT - np.arange(0, 40, MAP_STEP),
+        np.random.uniform(0, MAP_HEIGHT, MAP_NUM_RANDOM_OBSTACLES),
+    ]
+    return Obstacles(np.vstack((np.concatenate(ox), np.concatenate(oy))).T)
 
 
 def _get_random_car(obstacles: Obstacles) -> Car:
@@ -279,7 +279,7 @@ class MainWindow(QMainWindow):
             return
         if not (self._ui.set_pose_button.isChecked() or self._ui.set_goal_button.isChecked()):
             return
-        if not (0 <= event.xdata <= 60 and 0 <= event.ydata <= 60):
+        if not (0 <= event.xdata <= MAP_WIDTH and 0 <= event.ydata <= MAP_HEIGHT):
             return
         self._pressed_position = _PressedPosition(event.xdata, event.ydata)
 
