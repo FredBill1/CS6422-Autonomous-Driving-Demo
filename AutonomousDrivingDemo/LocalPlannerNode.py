@@ -21,6 +21,8 @@ def _worker_process(pipe: Connection, delta_time_s: float) -> None:
         elif isinstance(data, np.ndarray):
             mpc = ModelPredictiveControl(data)
         elif isinstance(data, Car):
+            if pipe.poll():  # discard outdated data
+                continue
             pipe.send(None if mpc is None else (data, mpc.update(data, delta_time_s)))
 
 
