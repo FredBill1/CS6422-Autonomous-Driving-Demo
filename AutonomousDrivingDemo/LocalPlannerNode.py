@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 
 from .local_planner.ModelPredictiveControl import ModelPredictiveControl, MPCResult
 from .modeling.Car import Car
+from .utils.PipeRecvWorker import PipeRecvWorker
 
 
 def _worker_process(pipe: Connection, delta_time_s: float) -> None:
@@ -20,7 +21,7 @@ def _worker_process(pipe: Connection, delta_time_s: float) -> None:
         elif isinstance(data, np.ndarray):
             mpc = ModelPredictiveControl(data)
         elif isinstance(data, Car):
-            pipe.send(None if mpc is None else mpc.update(data, delta_time_s))
+            pipe.send(None if mpc is None else (data, mpc.update(data, delta_time_s)))
 
 
 class LocalPlannerNode(QObject):
@@ -33,19 +34,15 @@ class LocalPlannerNode(QObject):
         self._delta_time_s = delta_time_s
         self._parent_pipe, self._child_pipe = mp.Pipe()
         self._worker = mp.Process(target=_worker_process, args=(self._child_pipe, delta_time_s), daemon=True)
+        self._recv_worker = PipeRecvWorker(self._parent_pipe, parent=self)
+        self._recv_worker.recv.connect(self._worker_recv)
+
         self._worker.start()
+        self._recv_worker.start()
 
     @Slot(float, Car)
     def update(self, timestamp_s: float, state: Car) -> None:
         self._parent_pipe.send(state)
-        result: Optional[MPCResult] = self._parent_pipe.recv()
-        if result is None:
-            return
-        acceleration, steer = result.controls[1]
-        control = (state.velocity + acceleration * self._delta_time_s, steer)
-        self.control.emit(control)
-        self.local_trajectory.emit(result.states[:, :2])
-        self.reference_points.emit(result.ref_states[:, :2])
 
     @Slot(np.ndarray)
     def set_trajectory(self, trajectory: npt.NDArray[np.floating[Any]]) -> None:
@@ -54,3 +51,14 @@ class LocalPlannerNode(QObject):
     @Slot()
     def cancel(self) -> None:
         self._parent_pipe.send(None)
+
+    @Slot(tuple)
+    def _worker_recv(self, data: Optional[tuple[Car, MPCResult]]) -> None:
+        if data is None:
+            return
+        state, result = data
+        acceleration, steer = result.controls[1]
+        control = (state.velocity + acceleration * self._delta_time_s, steer)
+        self.control.emit(control)
+        self.local_trajectory.emit(result.states[:, :2])
+        self.reference_points.emit(result.ref_states[:, :2])
