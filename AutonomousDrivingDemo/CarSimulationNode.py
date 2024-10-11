@@ -1,12 +1,10 @@
-from typing import Optional
+from typing import Any, Optional
 
+import numpy as np
+import numpy.typing as npt
 from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
 
 from .modeling.Car import Car
-
-import numpy.typing as npt
-import numpy as np
-from typing import Any
 
 
 class CarSimulationNode(QObject):
@@ -44,10 +42,11 @@ class CarSimulationNode(QObject):
         if self._control_sequence is None:
             self._real_state.update(self._delta_time_s)
             return
-        timestamps = self._control_sequence[:, 0]
-        i = np.argmin(np.abs(timestamps - self._timestamp_s))
-        control = self._control_sequence[i, 1:]
-        self._real_state.update_with_control(*control, self._delta_time_s)
+        t = np.clip(self._timestamp_s, self._control_sequence[0, 0], self._control_sequence[-1, 0])
+        timestamps, velocities, steers = self._control_sequence.T
+        velocity = np.interp(t, timestamps, velocities)
+        steer = np.interp(t, timestamps, steers)
+        self._real_state.update_with_control(velocity, steer, self._delta_time_s)
 
     @Slot()
     def _publish_state(self):
