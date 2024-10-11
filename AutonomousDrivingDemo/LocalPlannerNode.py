@@ -63,7 +63,8 @@ class LocalPlannerNode(QObject):
 
     @Slot()
     def _update(self) -> None:
-        self._parent_pipe.send(self._state)
+        if self._state is not None:
+            self._parent_pipe.send(self._state)
 
     @Slot(tuple)
     def _worker_recv(self, data: Optional[tuple[Car, MPCResult]]) -> None:
