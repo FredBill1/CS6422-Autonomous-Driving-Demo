@@ -52,6 +52,8 @@ class GlobalPlannerNode(QObject):
         self._recv_worker = PipeRecvWorker(self._parent_pipe, parent=self)
         self._recv_worker.recv.connect(self._worker_recv)
 
+    @Slot()
+    def start(self) -> None:
         self._worker.start()
         self._recv_worker.start()
 
