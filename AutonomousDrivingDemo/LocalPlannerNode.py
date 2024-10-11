@@ -4,11 +4,12 @@ from typing import Any, Optional
 
 import numpy as np
 import numpy.typing as npt
-from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
 
 from .local_planner.ModelPredictiveControl import ModelPredictiveControl, MPCResult
 from .modeling.Car import Car
 from .utils.PipeRecvWorker import PipeRecvWorker
+from .utils.set_high_priority import set_high_priority
 
 
 def _worker_process(pipe: Connection, delta_time_s: float) -> None:
@@ -48,7 +49,8 @@ class LocalPlannerNode(QObject):
     @Slot()
     def start(self) -> None:
         self._worker.start()
-        self._recv_worker.start()
+        set_high_priority(self._worker.pid)
+        self._recv_worker.start(QThread.Priority.HighestPriority)
         self._update_timer.start()
 
     @Slot(float, Car)

@@ -6,12 +6,13 @@ import matplotlib.colors as mcolors
 import numpy as np
 import numpy.typing as npt
 from matplotlib.collections import LineCollection
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 from .global_planner.hybrid_a_star import Node, hybrid_a_star
 from .modeling.Car import Car
 from .modeling.Obstacles import Obstacles
 from .utils.PipeRecvWorker import PipeRecvWorker
+from .utils.set_high_priority import set_high_priority
 
 
 def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
@@ -55,7 +56,8 @@ class GlobalPlannerNode(QObject):
     @Slot()
     def start(self) -> None:
         self._worker.start()
-        self._recv_worker.start()
+        set_high_priority(self._worker.pid)
+        self._recv_worker.start(QThread.Priority.HighestPriority)
 
     @Slot(Car, Car, Obstacles)
     def plan(self, start_state: Car, goal_state: Car, obstacles: Obstacles) -> None:

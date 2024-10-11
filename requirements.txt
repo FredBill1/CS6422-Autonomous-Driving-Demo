@@ -5,3 +5,4 @@ rsplan
 cvxpy
 PySide6
 qt_material
+psutil
