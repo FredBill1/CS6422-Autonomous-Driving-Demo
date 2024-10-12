@@ -150,13 +150,19 @@ class ModelPredictiveControl:
         assert ref_trajectory.shape[1] == 4, "Reference trajectory have [[x, y, yaw, direction], ...]"
         ref_trajectory[:, 2] = smooth_yaw(ref_trajectory[:, 2])
         v = ref_trajectory[:, 3]
-        v[:-1][v[1:] != v[:-1]] = 0.0  # make the vehicle stop at the direction change point
+        v[:-1][v[1:] != v[:-1]] = 0.0  # make the vehicle stop at the direction changing point
+
+        # remove the consecutive direction changing points
+        mask = ~((v == 0) & ((np.roll(v, 1) == 0) | (np.roll(v, -1) == 0)))
+        mask[0] = mask[-1] = True
+
         v *= Car.TARGET_SPEED  # make the target velocity at each point of the trajectory to be TARGET_SPEED
         v[-1] = 0.0  # make the vehicle stop at the goal
         self._goal = ref_trajectory[-1]
 
         # [x, y, yaw, v] -> [x, y, v, yaw]
         ref_trajectory = ref_trajectory[:, [0, 1, 3, 2]]
+        ref_trajectory = ref_trajectory[mask]
 
         # interpolate the reference trajectory
         dists = np.linalg.norm(ref_trajectory[1:, :2] - ref_trajectory[:-1, :2], axis=1)
@@ -203,7 +209,7 @@ class ModelPredictiveControl:
             else:
                 return xref  # if not, return the reference trajectory
 
-            # use binary search to find the direction change point:
+            # use binary search to find the direction changing point:
             l, r = ref_u[i - 1], ref_u[i]
             while r - l > 1e-6:
                 m = (l + r) / 2
@@ -213,12 +219,12 @@ class ModelPredictiveControl:
                     l = m
 
             # if the direction change happens only after the first points, we discard the first point and start to track the
-            # trajectory from the direction change point
+            # trajectory from the direction changing point
             if i <= 1:
                 self._cur_u = r
                 continue
 
-            # otherwise, we make the direction change point to have zero velocity, and the vehicle should stop at that point
+            # otherwise, we make the direction changing point to have zero velocity, and the vehicle should stop at that point
             xref = xref[:i]
             xref = np.vstack([xref, np.array(scipy.interpolate.splev(r, self._tck)).T])
             xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
