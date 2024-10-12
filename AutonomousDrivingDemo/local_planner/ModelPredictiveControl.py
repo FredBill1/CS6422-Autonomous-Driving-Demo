@@ -217,8 +217,8 @@ class ModelPredictiveControl:
                 else:
                     l = m
 
-            # if the direction change happens only after the first points, we discard the first point and start to track the
-            # trajectory from the direction changing point
+            # if the direction change happens immediately after the first point, we discard the first point
+            # and start to track the trajectory from the direction changing point
             if i <= 1:
                 self._cur_u = r
                 continue
