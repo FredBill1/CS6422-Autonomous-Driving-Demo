@@ -32,7 +32,7 @@ def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
                 nonlocal canceled
                 canceled = True
                 return True
-            pipe.send(LineCollection(display_segments, colors=mcolors.TABLEAU_COLORS))
+            pipe.send(display_segments)
             display_segments.clear()
             return False
 
@@ -44,7 +44,7 @@ def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
 class GlobalPlannerNode(QObject):
     finished = Signal()
     trajectory = Signal(np.ndarray)
-    display_segments = Signal(LineCollection)
+    display_segments = Signal(list)
 
     def __init__(self, segment_collection_size: int, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -70,8 +70,8 @@ class GlobalPlannerNode(QObject):
         self._parent_pipe.send(None)
 
     @Slot(object)
-    def _worker_recv(self, data: LineCollection | Optional[npt.NDArray[np.floating[Any]]]) -> None:
-        if isinstance(data, LineCollection):
+    def _worker_recv(self, data: list[npt.NDArray[np.floating[Any]]] | Optional[npt.NDArray[np.floating[Any]]]) -> None:
+        if isinstance(data, list):
             self.display_segments.emit(data)
         else:
             self.trajectory.emit(data)

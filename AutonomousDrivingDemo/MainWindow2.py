@@ -143,6 +143,19 @@ class MainWindow(QMainWindow):
         self._goal_unreachable_item.setVisible(False)
         self._plot_widget.addItem(self._goal_unreachable_item)
 
+        self._global_planner_node = GlobalPlannerNode(
+            segment_collection_size=GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE,
+        )
+        self.set_goal.connect(self._global_planner_node.plan)
+        self._global_planner_node.display_segments.connect(self._update_global_planner_display_segments)
+        self._global_planner_node.start()
+        self.canceled.connect(self._global_planner_node.cancel)
+        self._global_planner_node.trajectory.connect(self._update_trajectory)
+        self._global_planner_segments_items: list[pg.PlotCurveItem] = []
+        self._trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("b", width=2))
+        self._trajectory_item.setVisible(False)
+        self._plot_widget.addItem(self._trajectory_item)
+
     @Slot()
     def cancel(self):
         self._car_simulation_stopped = True
@@ -180,4 +193,24 @@ class MainWindow(QMainWindow):
             self._goal_pose_item.set_state(state)
             self._goal_pose_item.setVisible(True)
             self._goal_unreachable_item.setPos(start_x, start_y)
+
+    @Slot(list)
+    def _update_global_planner_display_segments(self, display_segments: list[npt.NDArray[np.floating[Any]]]) -> None:
+        # TODO: not efficient
+        for i, segment in enumerate(display_segments):
+            item = pg.PlotCurveItem(*segment.T, pen=pg.mkPen(i, len(display_segments) * 1.3))
+            self._plot_widget.addItem(item)
+            self._global_planner_segments_items.append(item)
+
+    @Slot(np.ndarray)
+    def _update_trajectory(self, trajectory: Optional[np.ndarray]) -> None:
+        for item in self._global_planner_segments_items:
+            self._plot_widget.removeItem(item)
+        self._global_planner_segments_items.clear()
+
+        if trajectory is not None:
+            self._trajectory_item.setData(*trajectory.T[:2])
+            self._trajectory_item.setVisible(True)
+            self._car_simulation_stopped = False
+        else:
             self._goal_unreachable_item.setVisible(True)
