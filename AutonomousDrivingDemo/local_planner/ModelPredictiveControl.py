@@ -15,7 +15,7 @@ NEARIST_POINT_SEARCH_RANGE = 3.0  # [m]
 NEARIST_POINT_SEARCH_STEP = 0.1  # [m]
 
 HORIZON_LENGTH = 5  # simulate count
-MIN_HORIZON_DISTANCE = 3.0  # [m]
+MIN_HORIZON_DISTANCE = 2.0  # [m]
 
 MAX_ITER = 5
 DU_TH = 0.1  # iteration finish param
@@ -150,6 +150,7 @@ class ModelPredictiveControl:
         assert ref_trajectory.shape[1] == 4, "Reference trajectory have [[x, y, yaw, direction], ...]"
         ref_trajectory[:, 2] = smooth_yaw(ref_trajectory[:, 2])
         v = ref_trajectory[:, 3]
+        v[:-1][v[1:] != v[:-1]] = 0.0  # make the vehicle stop at the direction change point
         v *= Car.TARGET_SPEED  # make the target velocity at each point of the trajectory to be TARGET_SPEED
         v[-1] = 0.0  # make the vehicle stop at the goal
         self._goal = ref_trajectory[-1]
@@ -210,8 +211,6 @@ class ModelPredictiveControl:
                     r = m
                 else:
                     l = m
-
-            print(ref_u, r)
 
             # if the direction change happens only after the first points, we discard the first point and start to track the
             # trajectory from the direction change point
