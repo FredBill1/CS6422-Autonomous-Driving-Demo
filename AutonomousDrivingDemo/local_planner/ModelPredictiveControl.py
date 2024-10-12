@@ -187,13 +187,37 @@ class ModelPredictiveControl:
             and abs(state.velocity) < GOAL_MAX_SPEED
         )
 
+    def _find_xref(self, state: Car, dt: float) -> npt.NDArray[np.floating[Any]]:
+        "Find the closest point in the reference trajectory, and interpolate the reference trajectory within a horizon"
+        while True:
+            # interpolate the reference trajectory
+            self._cur_u = self._nearist_point(state)
+            length = max(MIN_HORIZON_DISTANCE, abs(state.velocity) * dt * HORIZON_LENGTH)
+            ref_u = np.linspace(self._cur_u, self._cur_u + length, HORIZON_LENGTH + 1)
+            ref_u = np.clip(ref_u, a_min=None, a_max=self._u[-1])
+            xref = np.array(scipy.interpolate.splev(ref_u, self._tck)).T
+
+            # check if the reference trajectory contains a direction change
+            v = xref[:, 2]
+            for i in range(1, len(v)):
+                if v[i] * v[i - 1] < 0:
+                    break
+            else:
+                return xref  # if not, return the reference trajectory
+
+            # if the direction change is in the first half of the trajectory, re-find the nearist point
+            if i * 2 <= len(v):
+                self._cur_u = ref_u[i]
+                continue
+
+            # if the direction change is in the second half of the trajectory, return the first half of the trajectory
+            xref = xref[:i]
+            xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - i), (0, 0)), mode="edge")
+            xref[i:, 2] = 0.0
+            return xref
+
     def update(self, state: Car, dt: float) -> MPCResult:
-        # Find the closest point in the reference trajectory, discarding the points that have been passed.
-        self._cur_u = self._nearist_point(state)
-        length = max(MIN_HORIZON_DISTANCE, abs(state.velocity) * dt * HORIZON_LENGTH)
-        ref_u = np.linspace(self._cur_u, self._cur_u + length, HORIZON_LENGTH + 1)
-        ref_u = np.clip(ref_u, a_min=None, a_max=self._u[-1])
-        xref = np.array(scipy.interpolate.splev(ref_u, self._tck)).T
+        xref = self._find_xref(state, dt)
 
         # Align the yaw of the vehicle with the reference trajectory, to facilitate the calculation of
         # the yaw difference between the current state and the reference trajectory.
