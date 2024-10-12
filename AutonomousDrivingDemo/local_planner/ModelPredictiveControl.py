@@ -153,7 +153,8 @@ class ModelPredictiveControl:
         v[:-1][v[1:] != v[:-1]] = 0.0  # make the vehicle stop at the direction changing point
 
         # remove the consecutive direction changing points
-        mask = ~((v == 0) & ((np.roll(v, 1) == 0) | (np.roll(v, -1) == 0)))
+        mask = v == 0
+        mask = ~(mask & (np.roll(mask, 1) | np.roll(mask, -1)))
         mask[0] = mask[-1] = True
 
         v *= Car.TARGET_SPEED  # make the target velocity at each point of the trajectory to be TARGET_SPEED
