@@ -17,7 +17,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
-from PySide6.QtCore import QThread, Signal, Slot
+from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QMainWindow
 
 from .CarSimulationNode import CarSimulationNode
