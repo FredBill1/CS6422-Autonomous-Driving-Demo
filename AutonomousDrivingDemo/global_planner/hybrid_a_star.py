@@ -1,6 +1,6 @@
 import heapq
 from collections.abc import Callable, Generator
-from itertools import product
+from itertools import islice, product
 from typing import Any, Literal, NamedTuple, Optional
 
 import numpy as np
@@ -225,15 +225,13 @@ def hybrid_a_star(
             if isinstance(path, SimplePath):
                 segments.append(np.hstack((path.trajectory, np.full_like(path.trajectory[:, :1], path.direction))))
             else:
-                segments.append([[p.x, p.y, p.yaw, p.driving_direction] for p in path.waypoints()])
+                # RSPath contains the start point, so we skip it using islice
+                segments.append([[p.x, p.y, p.yaw, p.driving_direction] for p in islice(path.waypoints(), 1, None)])
             node = node.parent
         segments.reverse()
         trajectory = np.vstack(segments)
         if trajectory.shape[0] > 1:
             trajectory[0, 3] = trajectory[1, 3]  # set the initial driving direction
-        trajectory = trajectory[
-            np.append(np.linalg.norm(trajectory[:-1, :2] - trajectory[1:, :2], axis=1) >= MOTION_RESOLUTION / 2, True)
-        ]
         return trajectory
 
     # A* search (Similar to Dijkstra's algorithm, but with a heuristic cost added)
