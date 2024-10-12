@@ -2,6 +2,7 @@ from typing import Any, Optional
 
 import numpy as np
 import numpy.typing as npt
+import scipy.interpolate
 from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
 
 from .modeling.Car import Car
@@ -21,7 +22,8 @@ class CarSimulationNode(QObject):
     ) -> None:
         super().__init__(parent)
         self._real_state = initial_state
-        self._control_sequence: Optional[npt.NDArray[np.floating[Any]]] = None  # [[timestamp, velocity, steer], ...]
+        self._control_tck: Optional[tuple[npt.NDArray[np.floating[Any]], ...]] = None
+        self._control_u: Optional[npt.NDArray[np.floating[Any]]] = None
         self._delta_time_s = delta_time_s
         self._timestamp_s = 0.0
         self._stopped = True
@@ -39,13 +41,11 @@ class CarSimulationNode(QObject):
     @Slot()
     def _simulate(self):
         self._timestamp_s += self._delta_time_s
-        if self._control_sequence is None:
+        if self._control_tck is None:
             self._real_state.update(self._delta_time_s)
             return
-        t = np.clip(self._timestamp_s, self._control_sequence[0, 0], self._control_sequence[-1, 0])
-        timestamps, velocities, steers = self._control_sequence.T
-        velocity = np.interp(t, timestamps, velocities)
-        steer = np.interp(t, timestamps, steers)
+        t = np.clip(self._timestamp_s, self._control_u[0], self._control_u[-1])
+        velocity, steer = scipy.interpolate.splev(t, self._control_tck)
         self._real_state.update_with_control(velocity, steer, self._delta_time_s)
 
     @Slot()
@@ -61,7 +61,8 @@ class CarSimulationNode(QObject):
     def set_control_sequence(self, control_sequence: npt.NDArray[Any]) -> None:
         if self._stopped:
             return
-        self._control_sequence = control_sequence
+        timestamps, controls = control_sequence[:, 0], control_sequence[:, 1:]
+        self._control_tck, self._control_u = scipy.interpolate.splprep(controls.T, s=0, k=1, u=timestamps)
 
     @Slot(Car)
     def set_state(self, state: Car) -> None:
@@ -70,7 +71,7 @@ class CarSimulationNode(QObject):
     @Slot()
     def stop(self) -> None:
         self._real_state.velocity = self._real_state.steer = 0.0
-        self._control_sequence = None
+        self._control_tck = self._control_u = None
         self._stopped = True
 
     @Slot()
