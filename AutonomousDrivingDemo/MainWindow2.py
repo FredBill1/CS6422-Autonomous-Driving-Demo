@@ -17,7 +17,9 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
-from PySide6.QtCore import Signal, Slot, QTimer
+from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
+from PySide6.QtCore import Qt, QTimer, Signal, Slot
+from PySide6.QtGui import QFont, QMouseEvent
 from PySide6.QtWidgets import QMainWindow
 
 from .CarSimulationNode import CarSimulationNode
@@ -84,6 +86,16 @@ class _PressedPosition:
     yaw: Optional[float] = None
 
 
+class _CustomViewBox(pg.ViewBox):
+    sigMouseDrag = Signal(MouseDragEvent)
+
+    def mouseDragEvent(self, ev: MouseDragEvent) -> None:
+        if ev.button() != Qt.MouseButton.LeftButton:
+            return super().mouseDragEvent(ev)
+        ev.accept()
+        self.sigMouseDrag.emit(ev)
+
+
 class MainWindow(QMainWindow):
     set_state = Signal(Car)
     set_goal = Signal(Car, Car, Obstacles)
@@ -100,12 +112,14 @@ class MainWindow(QMainWindow):
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_timestamps: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._car_simulation_stopped = True
-        self._pressed_position: Optional[_PressedPosition] = None
 
         # setup ui
         self._ui = Ui_MainWindow()
         self._ui.setupUi(self)
-        self._plot_widget = pg.PlotWidget()
+        self._plot_viewbox = _CustomViewBox()
+        self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
+
+        self._plot_widget = pg.PlotWidget(viewBox=self._plot_viewbox)
         self._ui.visualization_canvas_layout.addWidget(self._plot_widget)
         self._plot_widget.setAspectLocked()
         self._plot_widget.addItem(pg.GridItem())
@@ -115,3 +129,55 @@ class MainWindow(QMainWindow):
         self._plot_widget.addItem(self._obstacle_item)
         self._measured_state_item = CarItem(self._measured_state)
         self._plot_widget.addItem(self._measured_state_item)
+
+        self._pressed_pose_item = CarItem(self._measured_state)
+        self._pressed_pose_item.setVisible(False)
+        self._plot_widget.addItem(self._pressed_pose_item)
+        self._goal_pose_item = CarItem(self._measured_state, color="r")
+        self._goal_pose_item.setVisible(False)
+        self._plot_widget.addItem(self._goal_pose_item)
+        self._goal_unreachable_item = pg.TextItem("Goal is unreachable", color="r")
+        font = QFont()
+        font.setPointSize(15)
+        self._goal_unreachable_item.setFont(font)
+        self._goal_unreachable_item.setVisible(False)
+        self._plot_widget.addItem(self._goal_unreachable_item)
+
+    @Slot()
+    def cancel(self):
+        self._car_simulation_stopped = True
+        self.canceled.emit()
+        self._goal_unreachable_item.setVisible(False)
+
+    @Slot(MouseDragEvent)
+    def _mouse_drag(self, ev: MouseDragEvent) -> None:
+        start_pos = self._plot_viewbox.mapSceneToView(ev.buttonDownScenePos())
+        start_x, start_y = start_pos.x(), start_pos.y()
+        if not (0 <= start_x <= MAP_WIDTH and 0 <= start_y <= MAP_HEIGHT):
+            return
+
+        self._goal_pose_item.setVisible(False)
+
+        pos = self._plot_viewbox.mapSceneToView(ev.scenePos())
+        x, y = pos.x(), pos.y()
+        state = Car(start_x, start_y, np.arctan2(y - start_y, x - start_x))
+        self._pressed_pose_item.set_state(state)
+        self._pressed_pose_item.setVisible(True)
+        if self._ui.set_goal_button.isChecked():
+            self._pressed_pose_item.set_color("r")
+        elif self._ui.set_pose_button.isChecked():
+            self._pressed_pose_item.set_color("g")
+
+        if not ev.isFinish():
+            return
+
+        self._pressed_pose_item.setVisible(False)
+
+        if self._ui.set_pose_button.isChecked():
+            self.set_state.emit(state)
+        elif self._ui.set_goal_button.isChecked():
+            self.set_goal.emit(self._measured_state, state, self._obstacles)
+            self._goal_pose_item.set_state(state)
+            self._goal_pose_item.setVisible(True)
+            self._goal_unreachable_item.setPos(start_x, start_y)
+            self._goal_unreachable_item.setVisible(True)
