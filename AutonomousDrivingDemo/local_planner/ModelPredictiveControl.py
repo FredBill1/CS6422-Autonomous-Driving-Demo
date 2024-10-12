@@ -12,6 +12,7 @@ from ..utils.wrap_angle import smooth_yaw, wrap_angle
 COURSE_TICK = 0.5  # [m], equal to MOTION_RESOLUTION from hybrid_a_star.py
 
 NEARIST_POINT_SEARCH_RANGE = 3.0  # [m]
+NEARIST_POINT_SEARCH_STEP = 0.1  # [m]
 
 HORIZON_LENGTH = 5  # simulate count
 MIN_HORIZON_DISTANCE = 2.0  # [m]
@@ -177,8 +178,13 @@ class ModelPredictiveControl:
         def cost(u: float) -> float:
             return np.linalg.norm(np.array(scipy.interpolate.splev(u, self._tck)[:2]).T - [state.x, state.y])
 
-        res = scipy.optimize.minimize_scalar(cost, bounds=(self._cur_u, self._cur_u + NEARIST_POINT_SEARCH_RANGE))
-        return res.x
+        min_dist, min_u = np.inf, self._cur_u
+        for u in np.arange(self._cur_u, self._cur_u + NEARIST_POINT_SEARCH_RANGE, NEARIST_POINT_SEARCH_STEP):
+            if (dist := cost(u)) < min_dist:
+                min_dist, min_u = dist, u
+            else:
+                break
+        return min_u
 
     def _goal_reached(self, state: Car) -> bool:
         return (
@@ -205,12 +211,13 @@ class ModelPredictiveControl:
             else:
                 return xref  # if not, return the reference trajectory
 
-            # if the direction change is in the first half of the trajectory, re-find the nearist point
-            if i * 2 <= len(v):
+            # if the direction change happens only after 2 points, we discard the first 2 points and start to track the
+            # trajectory from the third point
+            if i <= 2:
                 self._cur_u = ref_u[i]
                 continue
 
-            # if the direction change is in the second half of the trajectory, return the first half of the trajectory
+            # otherwise, we make the direction change point to have zero velocity, and the vehicle should stop at that point
             xref = xref[:i]
             xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - i), (0, 0)), mode="edge")
             xref[i:, 2] = 0.0
