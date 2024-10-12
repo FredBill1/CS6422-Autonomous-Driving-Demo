@@ -9,8 +9,6 @@ import scipy.optimize
 from ..modeling.Car import Car
 from ..utils.wrap_angle import smooth_yaw, wrap_angle
 
-COURSE_TICK = 0.5  # [m], equal to MOTION_RESOLUTION from hybrid_a_star.py
-
 NEARIST_POINT_SEARCH_RANGE = 3.0  # [m]
 NEARIST_POINT_SEARCH_STEP = 0.1  # [m]
 
