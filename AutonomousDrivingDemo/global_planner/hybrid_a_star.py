@@ -231,6 +231,9 @@ def hybrid_a_star(
         trajectory = np.vstack(segments)
         if trajectory.shape[0] > 1:
             trajectory[0, 3] = trajectory[1, 3]  # set the initial driving direction
+        trajectory = trajectory[
+            np.append(np.linalg.norm(trajectory[:-1, :2] - trajectory[1:, :2], axis=1) >= MOTION_RESOLUTION / 2, True)
+        ]
         return trajectory
 
     # A* search (Similar to Dijkstra's algorithm, but with a heuristic cost added)

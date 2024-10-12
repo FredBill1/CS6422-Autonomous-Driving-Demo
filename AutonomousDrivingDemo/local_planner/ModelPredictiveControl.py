@@ -3,6 +3,8 @@ from typing import Any, NamedTuple
 import cvxpy
 import numpy as np
 import numpy.typing as npt
+import scipy.interpolate
+import scipy.optimize
 
 from ..modeling.Car import Car
 from ..utils.wrap_angle import smooth_yaw, wrap_angle
@@ -10,9 +12,8 @@ from ..utils.wrap_angle import smooth_yaw, wrap_angle
 COURSE_TICK = 0.5  # [m], equal to MOTION_RESOLUTION from hybrid_a_star.py
 
 NEARIST_POINT_SEARCH_RANGE = 3.0  # [m]
-NEARIST_POINT_SEARCH_COUNT = int(NEARIST_POINT_SEARCH_RANGE // COURSE_TICK)
 
-HORIZON_LENGTH = 6  # simulate count
+HORIZON_LENGTH = 5  # simulate count
 MIN_HORIZON_DISTANCE = 2.0  # [m]
 
 MAX_ITER = 5
@@ -146,9 +147,8 @@ class MPCResult(NamedTuple):
 class ModelPredictiveControl:
     def __init__(self, ref_trajectory: npt.NDArray[np.floating[Any]]) -> None:
         assert ref_trajectory.shape[1] == 4, "Reference trajectory have [[x, y, yaw, direction], ...]"
-        self._ref_trajectory = ref_trajectory
-        self._ref_trajectory[:, 2] = smooth_yaw(self._ref_trajectory[:, 2])
-        v = self._ref_trajectory[:, 3]
+        ref_trajectory[:, 2] = smooth_yaw(ref_trajectory[:, 2])
+        v = ref_trajectory[:, 3]
         N = len(v)
 
         # make the target velocity at each direction changing point of the trajectory to be 0
@@ -160,27 +160,40 @@ class ModelPredictiveControl:
         # let the last few points of the trajectory to have zero velocity, to make the vehicle stop at the goal
         v[-min(N, np.ceil(GOAL_MAX_DISTANCE / COURSE_TICK / 2).astype(int)) :] = 0.0
 
-    def _nearist_point_index(self, state: Car) -> int:
-        ref_xy = self._ref_trajectory[:NEARIST_POINT_SEARCH_COUNT, :2]
-        dists = np.linalg.norm(ref_xy - [state.x, state.y], axis=1)
-        return np.argmin(dists)
+        self._goal = ref_trajectory[-1]
+
+        # [x, y, yaw, v] -> [x, y, v, yaw]
+        ref_trajectory = ref_trajectory[:, [0, 1, 3, 2]]
+
+        # interpolate the reference trajectory
+        dists = np.linalg.norm(ref_trajectory[1:, :2] - ref_trajectory[:-1, :2], axis=1)
+        u = np.concatenate(([0], np.cumsum(dists)))
+        self._tck, self._u = scipy.interpolate.splprep(ref_trajectory.T, s=0, k=1, u=u)
+        self._cur_u = 0.0
+
+    def _nearist_point(self, state: Car) -> float:
+        "find the nearist point on the reference trajectory to the given state"
+
+        def cost(u: float) -> float:
+            return np.linalg.norm(np.array(scipy.interpolate.splev(u, self._tck)[:2]).T - [state.x, state.y])
+
+        res = scipy.optimize.minimize_scalar(cost, bounds=(self._cur_u, self._cur_u + NEARIST_POINT_SEARCH_RANGE))
+        return res.x
 
     def _goal_reached(self, state: Car) -> bool:
         return (
-            np.linalg.norm(self._ref_trajectory[-1, :2] - [state.x, state.y]) < GOAL_MAX_DISTANCE
-            and abs(wrap_angle(self._ref_trajectory[-1, 2] - state.yaw)) < GOAL_YAW_DIFF
+            np.linalg.norm(self._goal[:2] - [state.x, state.y]) < GOAL_MAX_DISTANCE
+            and abs(wrap_angle(self._goal[2] - state.yaw)) < GOAL_YAW_DIFF
             and abs(state.velocity) < GOAL_MAX_SPEED
         )
 
     def update(self, state: Car, dt: float) -> MPCResult:
         # Find the closest point in the reference trajectory, discarding the points that have been passed.
-        self._ref_trajectory = self._ref_trajectory[self._nearist_point_index(state) :]
-        ids = np.round(
-            np.arange(HORIZON_LENGTH + 1)
-            * (max(MIN_HORIZON_DISTANCE / HORIZON_LENGTH, abs(state.velocity) * dt) / COURSE_TICK)
-        )
-        xref = self._ref_trajectory[np.clip(ids.astype(int), None, self._ref_trajectory.shape[0] - 1)]
-        xref = xref[:, [0, 1, 3, 2]]  # [x, y, yaw, v] -> [x, y, v, yaw]
+        self._cur_u = self._nearist_point(state)
+        length = max(MIN_HORIZON_DISTANCE, abs(state.velocity) * dt * HORIZON_LENGTH)
+        ref_u = np.linspace(self._cur_u, self._cur_u + length, HORIZON_LENGTH + 1)
+        ref_u = np.clip(ref_u, a_min=None, a_max=self._u[-1])
+        xref = np.array(scipy.interpolate.splev(ref_u, self._tck)).T
 
         # Align the yaw of the vehicle with the reference trajectory, to facilitate the calculation of
         # the yaw difference between the current state and the reference trajectory.
