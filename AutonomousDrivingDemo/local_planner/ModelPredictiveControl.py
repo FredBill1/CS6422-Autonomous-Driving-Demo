@@ -211,14 +211,6 @@ class ModelPredictiveControl:
             else:
                 return xref  # if not, return the reference trajectory
 
-            # if the direction change happens only after 2 points, we discard the first 2 points and start to track the
-            # trajectory from the third point
-            if i <= 2:
-                self._cur_u = ref_u[i]
-                continue
-
-            # otherwise, we make the direction change point to have zero velocity, and the vehicle should stop at that point
-            xref = xref[:i]
             # use binary search to find the direction change point:
             l, r = ref_u[i - 1], ref_u[i]
             while r - l > 1e-6:
@@ -227,6 +219,15 @@ class ModelPredictiveControl:
                     r = m
                 else:
                     l = m
+
+            # if the direction change happens only after 2 points, we discard the first 2 points and start to track the
+            # trajectory from the direction change point
+            if i <= 2:
+                self._cur_u = r
+                continue
+
+            # otherwise, we make the direction change point to have zero velocity, and the vehicle should stop at that point
+            xref = xref[:i]
             xref = np.vstack([xref, np.array(scipy.interpolate.splev(r, self._tck)).T])
             xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
             xref[i:, 2] = 0.0
