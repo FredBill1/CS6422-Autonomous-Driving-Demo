@@ -256,6 +256,7 @@ class MainWindow(QMainWindow):
         self._measured_velocities.append(state.velocity * 3.6)  # m/s -> km/h
         self._measured_steers.append(np.rad2deg(state.steer))
         self._measured_state_item.set_state(state)
+        self._plot_widget.setTitle(f"Timestamp: {timestamp_s:.2f}")
 
     @Slot()
     def cancel(self):
