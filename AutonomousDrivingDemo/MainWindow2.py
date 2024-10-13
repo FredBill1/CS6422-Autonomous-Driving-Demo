@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
         self._plot_viewbox = _CustomViewBox()
         self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
 
-        self._plot_widget = pg.PlotWidget(viewBox=self._plot_viewbox)
+        self._plot_widget = pg.PlotWidget(viewBox=self._plot_viewbox, title="Timestamp: 0.0s")
         self._ui.visualization_canvas_layout.addWidget(self._plot_widget)
         self._plot_widget.setAspectLocked()
         self._plot_widget.addItem(pg.GridItem())
@@ -256,7 +256,7 @@ class MainWindow(QMainWindow):
         self._measured_velocities.append(state.velocity * 3.6)  # m/s -> km/h
         self._measured_steers.append(np.rad2deg(state.steer))
         self._measured_state_item.set_state(state)
-        self._plot_widget.setTitle(f"Timestamp: {timestamp_s:.2f}")
+        self._plot_widget.setTitle(f"Timestamp: {timestamp_s:.2f}s")
 
     @Slot()
     def cancel(self):
