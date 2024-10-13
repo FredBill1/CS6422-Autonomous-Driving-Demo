@@ -79,13 +79,6 @@ def _get_random_car(obstacles: Obstacles) -> Car:
     return Car(*state)
 
 
-@dataclass(slots=True)
-class _PressedPosition:
-    x: float
-    y: float
-    yaw: Optional[float] = None
-
-
 class _CustomViewBox(pg.ViewBox):
     sigMouseDrag = Signal(MouseDragEvent)
 
