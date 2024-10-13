@@ -149,6 +149,16 @@ class MainWindow(QMainWindow):
         self._trajectory_item.setVisible(False)
         self._plot_widget.addItem(self._trajectory_item)
 
+        self._car_simulation_node = CarSimulationNode(
+            initial_state=self._measured_state.copy(),
+            delta_time_s=SIMULATION_DELTA_TIME,
+            simulation_interval_s=SIMULATION_INTERVAL,
+            simulation_publish_interval_s=SIMULATION_PUBLISH_INTERVAL,
+        )
+        self._car_simulation_node.measured_state.connect(self._update_measured_state)
+        self.set_state.connect(self._car_simulation_node.set_state)
+        self._car_simulation_node.start()
+
         self._plot_viewbox.disableAutoRange()
 
     @Slot()
@@ -215,3 +225,16 @@ class MainWindow(QMainWindow):
             self._car_simulation_stopped = False
         else:
             self._goal_unreachable_item.setVisible(True)
+
+    @Slot(float, Car)
+    def _update_measured_state(self, timestamp_s: float, state: Car) -> None:
+        self._measured_state = state
+        self._measured_timestamp = timestamp_s
+        if len(self._measured_timestamps) >= DASHBOARD_HISTORY_SIZE:
+            self._measured_timestamps.popleft()
+            self._measured_velocities.popleft()
+            self._measured_steers.popleft()
+        self._measured_timestamps.append(timestamp_s)
+        self._measured_velocities.append(state.velocity * 3.6)  # m/s -> km/h
+        self._measured_steers.append(np.rad2deg(state.steer))
+        self._measured_state_item.set_state(state)

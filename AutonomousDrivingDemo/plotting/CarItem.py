@@ -17,6 +17,7 @@ class CarItem(pg.GraphicsObject):
         self.set_state(car)
 
     def set_state(self, car: Car) -> None:
+        self.prepareGeometryChange()
         self._car = car
 
         # Outline and wheels geometry
