@@ -98,79 +98,82 @@ class MainWindow(QMainWindow):
         # setup ui
         self._ui = Ui_MainWindow()
         self._ui.setupUi(self)
-        self._ui.cancel_button.clicked.connect(self.cancel)
-        self._plot_viewbox = _CustomViewBox()
-        self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
 
+        self._plot_viewbox = _CustomViewBox()
         self._plot_widget = pg.PlotWidget(viewBox=self._plot_viewbox, title="Timestamp: 0.0s")
-        self._visualization_dock = Dock("Visualization", size=(4, 2))
-        self._ui.dockarea.addDock(self._visualization_dock, "left")
-        self._visualization_dock.addWidget(self._plot_widget)
         self._plot_widget.setAspectLocked()
         self._plot_widget.addItem(pg.GridItem())
+
+        self._velocity_plot_widget = pg.PlotWidget(title="Velocity")
+        self._velocity_plot_widget.disableAutoRange(axis=pg.ViewBox.YAxis)
+        self._velocity_plot_widget.setYRange(Car.MIN_SPEED * 3.6, Car.MAX_SPEED * 3.6)
+        self._velocity_plot_widget.addItem(pg.GridItem())
+        self._steer_plot_widget = pg.PlotWidget(title="Steer")
+        self._steer_plot_widget.disableAutoRange(axis=pg.ViewBox.YAxis)
+        self._steer_plot_widget.setYRange(-np.rad2deg(Car.MAX_STEER), np.rad2deg(Car.MAX_STEER))
+        self._steer_plot_widget.addItem(pg.GridItem())
+
+        # docks
+        self._visualization_dock = Dock("Visualization", size=(4, 2))
+        self._velocity_plot_dock = Dock("Velocity", size=(2, 2))
+        self._steer_plot_dock = Dock("Steer", size=(2, 2))
+        self._visualization_dock.addWidget(self._plot_widget)
+        self._velocity_plot_dock.addWidget(self._velocity_plot_widget)
+        self._steer_plot_dock.addWidget(self._steer_plot_widget)
+        self._ui.dockarea.addDock(self._visualization_dock, "left")
+        self._ui.dockarea.addDock(self._velocity_plot_dock, "right", self._visualization_dock)
+        self._ui.dockarea.addDock(self._steer_plot_dock, "bottom", self._velocity_plot_dock)
+
+        # graphics items
         self._obstacle_item = pg.ScatterPlotItem(
             *self._obstacles.coordinates.T, size=5, symbol="o", pen=None, brush=(255, 0, 0)
         )
-        self._plot_widget.addItem(self._obstacle_item)
         self._measured_state_item = CarItem(self._measured_state)
-        self._plot_widget.addItem(self._measured_state_item)
-
-        self._pressed_pose_item = CarItem(self._measured_state)
+        self._pressed_pose_item = CarItem(self._measured_state, color="r")
         self._pressed_pose_item.setVisible(False)
-        self._plot_widget.addItem(self._pressed_pose_item)
         self._goal_pose_item = CarItem(self._measured_state, color="r")
         self._goal_pose_item.setVisible(False)
-        self._plot_widget.addItem(self._goal_pose_item)
         self._goal_unreachable_item = pg.TextItem("Goal is unreachable", color="r")
         font = QFont()
         font.setPointSize(15)
         self._goal_unreachable_item.setFont(font)
         self._goal_unreachable_item.setVisible(False)
-        self._plot_widget.addItem(self._goal_unreachable_item)
         self._local_trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("g"))
-        self._plot_widget.addItem(self._local_trajectory_item)
         self._reference_points_item = pg.ScatterPlotItem(size=10, symbol="x", pen=pg.mkPen("r"))
-        self._plot_widget.addItem(self._reference_points_item)
-        self._velocity_plot_widget = pg.PlotWidget(title="Velocity")
-        self._velocity_plot_dock = Dock("Velocity", size=(2, 2))
-        self._ui.dockarea.addDock(self._velocity_plot_dock, "right", self._visualization_dock)
-        self._velocity_plot_dock.addWidget(self._velocity_plot_widget)
-        self._velocity_plot_widget.disableAutoRange(axis=pg.ViewBox.YAxis)
-        self._velocity_plot_widget.setYRange(Car.MIN_SPEED * 3.6, Car.MAX_SPEED * 3.6)
-        self._velocity_plot_widget.addItem(pg.GridItem())
-        self._steer_plot_widget = pg.PlotWidget(title="Steer")
-        self._steer_plot_dock = Dock("Steer", size=(2, 2))
-        self._ui.dockarea.addDock(self._steer_plot_dock, "bottom", self._velocity_plot_dock)
-        self._steer_plot_dock.addWidget(self._steer_plot_widget)
-        self._steer_plot_widget.disableAutoRange(axis=pg.ViewBox.YAxis)
-        self._steer_plot_widget.setYRange(-np.rad2deg(Car.MAX_STEER), np.rad2deg(Car.MAX_STEER))
-        self._steer_plot_widget.addItem(pg.GridItem())
-
-        self._velocity_plot_item = pg.PlotCurveItem(pen=pg.mkPen("y"))
-        self._velocity_plot_widget.addItem(self._velocity_plot_item)
-        self._steer_plot_item = pg.PlotCurveItem(pen=pg.mkPen("g"))
-        self._steer_plot_widget.addItem(self._steer_plot_item)
-
-        self._global_planner_node = GlobalPlannerNode(
-            segment_collection_size=GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE,
-        )
         self._global_planner_segments_items: list[pg.PlotCurveItem] = []
         self._trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("b"))
         self._trajectory_item.setVisible(False)
+        self._plot_widget.addItem(self._obstacle_item)
         self._plot_widget.addItem(self._trajectory_item)
+        self._plot_widget.addItem(self._measured_state_item)
+        self._plot_widget.addItem(self._goal_pose_item)
+        self._plot_widget.addItem(self._pressed_pose_item)
+        self._plot_widget.addItem(self._reference_points_item)
+        self._plot_widget.addItem(self._local_trajectory_item)
+        self._plot_widget.addItem(self._goal_unreachable_item)
+        self._plot_viewbox.disableAutoRange()
 
+        self._velocity_plot_item = pg.PlotCurveItem(pen=pg.mkPen("y"))
+        self._steer_plot_item = pg.PlotCurveItem(pen=pg.mkPen("g"))
+        self._velocity_plot_widget.addItem(self._velocity_plot_item)
+        self._steer_plot_widget.addItem(self._steer_plot_item)
+
+        # declare nodes
         self._car_simulation_node = CarSimulationNode(
             initial_state=self._measured_state.copy(),
             delta_time_s=SIMULATION_DELTA_TIME,
             simulation_interval_s=SIMULATION_INTERVAL,
             simulation_publish_interval_s=SIMULATION_PUBLISH_INTERVAL,
         )
-
+        self._global_planner_node = GlobalPlannerNode(
+            segment_collection_size=GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE,
+        )
         self._local_planner_node = LocalPlannerNode(
             delta_time_s=LOCAL_PLANNER_DELTA_TIME,
             update_interval_s=LOCAL_PLANNER_UPDATE_INTERVAL,
         )
 
+        # connect signals
         self._car_simulation_node.measured_state.connect(self._local_planner_node.set_state)
         self._car_simulation_node.measured_state.connect(self._update_measured_state)
         self._global_planner_node.display_segments.connect(self._update_global_planner_display_segments)
@@ -186,10 +189,24 @@ class MainWindow(QMainWindow):
         self.set_goal.connect(self._global_planner_node.plan)
         self.set_state.connect(self._car_simulation_node.set_state)
 
-        self._plot_viewbox.disableAutoRange()
+        self._ui.cancel_button.clicked.connect(self.cancel)
+        self._ui.set_pose_button.clicked.connect(lambda: self._pressed_pose_item.set_color("g"))
+        self._ui.set_goal_button.clicked.connect(lambda: self._pressed_pose_item.set_color("r"))
+        self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
+
+        # start tasks
         self._car_simulation_node.start()
         self._global_planner_node.start()
         self._local_planner_node.start()
+
+    @Slot()
+    def cancel(self):
+        self._car_simulation_stopped = True
+        self.canceled.emit()
+        self._clear_global_planner_display_segments()
+        self._local_trajectory_item.setData([], [])
+        self._reference_points_item.setData([], [])
+        self._goal_unreachable_item.setVisible(False)
 
     @Slot(MouseDragEvent)
     def _mouse_drag(self, ev: MouseDragEvent) -> None:
@@ -205,10 +222,6 @@ class MainWindow(QMainWindow):
         state = Car(start_x, start_y, np.arctan2(y - start_y, x - start_x))
         self._pressed_pose_item.set_state(state)
         self._pressed_pose_item.setVisible(True)
-        if self._ui.set_goal_button.isChecked():
-            self._pressed_pose_item.set_color("r")
-        elif self._ui.set_pose_button.isChecked():
-            self._pressed_pose_item.set_color("g")
 
         if not ev.isFinish():
             return
@@ -272,15 +285,6 @@ class MainWindow(QMainWindow):
         self._steer_plot_item.setData(timestamps, steers)
         self._measured_state_item.set_state(state)
         self._plot_widget.setTitle(f"Timestamp: {timestamp_s:.2f}s")
-
-    @Slot()
-    def cancel(self):
-        self._car_simulation_stopped = True
-        self.canceled.emit()
-        self._clear_global_planner_display_segments()
-        self._local_trajectory_item.setData([], [])
-        self._reference_points_item.setData([], [])
-        self._goal_unreachable_item.setVisible(False)
 
     @Slot(np.ndarray)
     def _update_local_trajectory(self, local_trajectory: npt.NDArray[np.floating[Any]]) -> None:
