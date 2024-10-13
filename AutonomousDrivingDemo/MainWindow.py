@@ -129,10 +129,10 @@ class MainWindow(QMainWindow):
         self._obstacle_item = pg.ScatterPlotItem(
             *self._obstacles.coordinates.T, size=5, symbol="o", pen=None, brush=(255, 0, 0)
         )
-        self._measured_state_item = CarItem(self._measured_state)
-        self._pressed_pose_item = CarItem(self._measured_state, color="r")
+        self._measured_state_item = CarItem(self._measured_state, color="w")
+        self._pressed_pose_item = CarItem(self._measured_state, color="g")
         self._pressed_pose_item.setVisible(False)
-        self._goal_pose_item = CarItem(self._measured_state, color="r")
+        self._goal_pose_item = CarItem(self._measured_state, color="g")
         self._goal_pose_item.setVisible(False)
         self._goal_unreachable_item = pg.TextItem("Goal is unreachable", color="r")
         font = QFont()
@@ -142,7 +142,7 @@ class MainWindow(QMainWindow):
         self._local_trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("g"))
         self._reference_points_item = pg.ScatterPlotItem(size=10, symbol="x", pen=pg.mkPen("r"))
         self._global_planner_segments_items: list[pg.PlotCurveItem] = []
-        self._trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("b"))
+        self._trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("c"))
         self._trajectory_item.setVisible(False)
         self._plot_widget.addItem(self._obstacle_item)
         self._plot_widget.addItem(self._trajectory_item)
@@ -191,8 +191,8 @@ class MainWindow(QMainWindow):
         self.set_state.connect(self._car_simulation_node.set_state)
 
         self._ui.cancel_button.clicked.connect(self.cancel)
-        self._ui.set_pose_button.clicked.connect(lambda: self._pressed_pose_item.set_color("g"))
-        self._ui.set_goal_button.clicked.connect(lambda: self._pressed_pose_item.set_color("r"))
+        self._ui.set_pose_button.clicked.connect(lambda: self._pressed_pose_item.set_color("w"))
+        self._ui.set_goal_button.clicked.connect(lambda: self._pressed_pose_item.set_color("g"))
         self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
 
         # start tasks
