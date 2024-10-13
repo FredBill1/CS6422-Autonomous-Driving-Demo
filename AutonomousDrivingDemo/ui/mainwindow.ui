@@ -22,14 +22,7 @@
    </property>
    <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0">
     <item>
-     <layout class="QHBoxLayout" name="display_layout" stretch="2,1">
-      <item>
-       <layout class="QVBoxLayout" name="visualization_canvas_layout"/>
-      </item>
-      <item>
-       <layout class="QVBoxLayout" name="dashboard_canvas_layout"/>
-      </item>
-     </layout>
+     <widget class="DockArea" name="dockarea" native="true"/>
     </item>
     <item>
      <layout class="QHBoxLayout" name="control_layout">
@@ -96,6 +89,14 @@
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DockArea</class>
+   <extends>QWidget</extends>
+   <header>pyqtgraph.dockarea.DockArea</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

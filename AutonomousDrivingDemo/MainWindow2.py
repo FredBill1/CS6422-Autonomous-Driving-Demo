@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import MutableSequence
 from dataclasses import dataclass
 from typing import Any, Optional, override
+from pyqtgraph.dockarea.Dock import Dock
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -114,7 +115,9 @@ class MainWindow(QMainWindow):
         self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
 
         self._plot_widget = pg.PlotWidget(viewBox=self._plot_viewbox, title="Timestamp: 0.0s")
-        self._ui.visualization_canvas_layout.addWidget(self._plot_widget)
+        self._visualization_dock = Dock("Visualization", size=(500, 500))
+        self._ui.dockarea.addDock(self._visualization_dock)
+        self._visualization_dock.addWidget(self._plot_widget)
         self._plot_widget.setAspectLocked()
         self._plot_widget.addItem(pg.GridItem())
         self._obstacle_item = pg.ScatterPlotItem(

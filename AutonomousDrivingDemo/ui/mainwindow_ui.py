@@ -18,6 +18,8 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow, QPushButton,
     QSizePolicy, QSpacerItem, QVBoxLayout, QWidget)
 
+from pyqtgraph.dockarea.DockArea import DockArea
+
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
@@ -28,22 +30,10 @@ class Ui_MainWindow(object):
         self.central_widget.setMinimumSize(QSize(200, 200))
         self.verticalLayout = QVBoxLayout(self.central_widget)
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.display_layout = QHBoxLayout()
-        self.display_layout.setObjectName(u"display_layout")
-        self.visualization_canvas_layout = QVBoxLayout()
-        self.visualization_canvas_layout.setObjectName(u"visualization_canvas_layout")
+        self.dockarea = DockArea(self.central_widget)
+        self.dockarea.setObjectName(u"dockarea")
 
-        self.display_layout.addLayout(self.visualization_canvas_layout)
-
-        self.dashboard_canvas_layout = QVBoxLayout()
-        self.dashboard_canvas_layout.setObjectName(u"dashboard_canvas_layout")
-
-        self.display_layout.addLayout(self.dashboard_canvas_layout)
-
-        self.display_layout.setStretch(0, 2)
-        self.display_layout.setStretch(1, 1)
-
-        self.verticalLayout.addLayout(self.display_layout)
+        self.verticalLayout.addWidget(self.dockarea)
 
         self.control_layout = QHBoxLayout()
         self.control_layout.setObjectName(u"control_layout")
