@@ -3,24 +3,16 @@ import PySide6
 "set PySide6 backend"
 
 from collections import deque
-from collections.abc import MutableSequence
 from dataclasses import dataclass
 from typing import Any, Optional, override
-from pyqtgraph.dockarea.Dock import Dock
 
-import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import pyqtgraph as pg
-from matplotlib.animation import FuncAnimation
-from matplotlib.backend_bases import MouseEvent
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.collections import LineCollection
-from matplotlib.figure import Figure
+from pyqtgraph.dockarea.Dock import Dock
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
-from PySide6.QtCore import Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QFont, QMouseEvent
+from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QMainWindow
 
 from .CarSimulationNode import CarSimulationNode

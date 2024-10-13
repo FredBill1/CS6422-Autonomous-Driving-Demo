@@ -1,7 +1,6 @@
 from dataclasses import dataclass, replace
-from typing import Any, Optional
+from typing import Any
 
-import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 
@@ -124,34 +123,3 @@ class Car:
         if with_noise:
             scan += np.random.randn(*scan.shape) * self.SCAN_SIGMA
         return ids, scan
-
-    def plot(
-        self, color="k", *, ax: Optional[plt.Axes] = None, artists: Optional[list[plt.Line2D]] = None
-    ) -> list[plt.Line2D]:
-        assert not (ax is None and artists is None), "Either `ax` or `artists` must be provided"
-        BOX = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1], [-1, -1]]) / 2
-        outline = BOX * [self.LENGTH, self.WIDTH] + [self.LENGTH / 2 - self.BACK_TO_WHEEL, 0]
-        wheel = BOX * [self.WHEEL_LENGTH, self.WHEEL_WIDTH]
-
-        cy, sy = np.cos(self.yaw), np.sin(self.yaw)
-        cs, ss = np.cos(self.steer), np.sin(self.steer)
-        rot1 = np.array([[cy, -sy], [sy, cy]])
-        rot2 = np.array([[cs, -ss], [ss, cs]])
-        f_wheel = (rot2 @ wheel.T).T
-        fl_wheel = f_wheel + [self.WHEEL_BASE, self.WHEEL_SPACING / 2]
-        fr_wheel = f_wheel + [self.WHEEL_BASE, -self.WHEEL_SPACING / 2]
-        rl_wheel = wheel + [0, self.WHEEL_SPACING / 2]
-        rr_wheel = wheel + [0, -self.WHEEL_SPACING / 2]
-
-        if artists is None:
-            artists = []
-            for box in (outline, fl_wheel, fr_wheel, rl_wheel, rr_wheel):
-                box = (rot1 @ box.T).T + [self.x, self.y]
-                artists.extend(ax.plot(*box.T, "-", color=color))
-            artists.extend(ax.plot(self.x, self.y, "*", color=color))
-        else:
-            for artist, box in zip(artists, (outline, fl_wheel, fr_wheel, rl_wheel, rr_wheel)):
-                box = (rot1 @ box.T).T + [self.x, self.y]
-                artist.set_data(*box.T)
-            artists[-1].set_data([self.x], [self.y])
-        return artists

@@ -1,6 +1,5 @@
 numpy
 scipy
-matplotlib
 rsplan
 cvxpy
 PySide6
