@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         # setup ui
         self._ui = Ui_MainWindow()
         self._ui.setupUi(self)
+        self._ui.cancel_button.clicked.connect(self.cancel)
         self._plot_viewbox = _CustomViewBox()
         self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
 
@@ -176,12 +177,6 @@ class MainWindow(QMainWindow):
         self._global_planner_node.start()
         self._local_planner_node.start()
 
-    @Slot()
-    def cancel(self):
-        self._car_simulation_stopped = True
-        self.canceled.emit()
-        self._goal_unreachable_item.setVisible(False)
-
     @Slot(MouseDragEvent)
     def _mouse_drag(self, ev: MouseDragEvent) -> None:
         start_pos = self._plot_viewbox.mapSceneToView(ev.buttonDownScenePos())
@@ -206,7 +201,7 @@ class MainWindow(QMainWindow):
 
         self._pressed_pose_item.setVisible(False)
         self._trajectory_item.setVisible(False)
-        self._clear_global_planner_display_segments()
+        self.cancel()
 
         if self._ui.set_pose_button.isChecked():
             self.set_state.emit(state)
@@ -257,3 +252,12 @@ class MainWindow(QMainWindow):
         self._measured_velocities.append(state.velocity * 3.6)  # m/s -> km/h
         self._measured_steers.append(np.rad2deg(state.steer))
         self._measured_state_item.set_state(state)
+
+    @Slot()
+    def cancel(self):
+        self._car_simulation_stopped = True
+        self.canceled.emit()
+        self._clear_global_planner_display_segments()
+        # self._clear_artists(self._local_trajectory_artist)
+        # self._clear_artists(self._reference_points_artist)
+        self._goal_unreachable_item.setVisible(False)

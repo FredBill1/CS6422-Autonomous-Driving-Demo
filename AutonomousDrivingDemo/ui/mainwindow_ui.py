@@ -62,14 +62,6 @@ class Ui_MainWindow(object):
 
         self.control_layout.addWidget(self.set_pose_button)
 
-        self.navigate_button = QPushButton(self.central_widget)
-        self.navigate_button.setObjectName(u"navigate_button")
-        self.navigate_button.setCheckable(True)
-        self.navigate_button.setChecked(False)
-        self.navigate_button.setAutoExclusive(True)
-
-        self.control_layout.addWidget(self.navigate_button)
-
         self.cancel_button = QPushButton(self.central_widget)
         self.cancel_button.setObjectName(u"cancel_button")
 
@@ -99,10 +91,6 @@ class Ui_MainWindow(object):
         self.set_pose_button.setText(QCoreApplication.translate("MainWindow", u"Set Pose(S)", None))
 #if QT_CONFIG(shortcut)
         self.set_pose_button.setShortcut(QCoreApplication.translate("MainWindow", u"S", None))
-#endif // QT_CONFIG(shortcut)
-        self.navigate_button.setText(QCoreApplication.translate("MainWindow", u"Navigate(D)", None))
-#if QT_CONFIG(shortcut)
-        self.navigate_button.setShortcut(QCoreApplication.translate("MainWindow", u"D", None))
 #endif // QT_CONFIG(shortcut)
         self.cancel_button.setText(QCoreApplication.translate("MainWindow", u"Cancel(F)", None))
 #if QT_CONFIG(shortcut)
