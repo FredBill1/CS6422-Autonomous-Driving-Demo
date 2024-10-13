@@ -139,11 +139,6 @@ class MainWindow(QMainWindow):
         self._global_planner_node = GlobalPlannerNode(
             segment_collection_size=GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE,
         )
-        self.set_goal.connect(self._global_planner_node.plan)
-        self._global_planner_node.display_segments.connect(self._update_global_planner_display_segments)
-        self._global_planner_node.start()
-        self.canceled.connect(self._global_planner_node.cancel)
-        self._global_planner_node.trajectory.connect(self._update_trajectory)
         self._global_planner_segments_items: list[pg.PlotCurveItem] = []
         self._trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("b", width=2))
         self._trajectory_item.setVisible(False)
@@ -155,11 +150,31 @@ class MainWindow(QMainWindow):
             simulation_interval_s=SIMULATION_INTERVAL,
             simulation_publish_interval_s=SIMULATION_PUBLISH_INTERVAL,
         )
+
+        self._local_planner_node = LocalPlannerNode(
+            delta_time_s=LOCAL_PLANNER_DELTA_TIME,
+            update_interval_s=LOCAL_PLANNER_UPDATE_INTERVAL,
+        )
+
+        self._car_simulation_node.measured_state.connect(self._local_planner_node.set_state)
         self._car_simulation_node.measured_state.connect(self._update_measured_state)
+        self._global_planner_node.display_segments.connect(self._update_global_planner_display_segments)
+        self._global_planner_node.finished.connect(self._car_simulation_node.resume)
+        self._global_planner_node.trajectory.connect(self._local_planner_node.set_trajectory)
+        self._global_planner_node.trajectory.connect(self._update_trajectory)
+        self._local_planner_node.control_sequence.connect(self._car_simulation_node.set_control_sequence)
+        # self._local_planner_node.local_trajectory.connect(self._update_local_trajectory)
+        # self._local_planner_node.reference_points.connect(self._update_reference_points)
+        self.canceled.connect(self._car_simulation_node.stop)
+        self.canceled.connect(self._global_planner_node.cancel)
+        self.canceled.connect(self._local_planner_node.cancel)
+        self.set_goal.connect(self._global_planner_node.plan)
         self.set_state.connect(self._car_simulation_node.set_state)
-        self._car_simulation_node.start()
 
         self._plot_viewbox.disableAutoRange()
+        self._car_simulation_node.start()
+        self._global_planner_node.start()
+        self._local_planner_node.start()
 
     @Slot()
     def cancel(self):
