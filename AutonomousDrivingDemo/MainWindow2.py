@@ -174,7 +174,6 @@ class MainWindow(QMainWindow):
         if not (0 <= start_x <= MAP_WIDTH and 0 <= start_y <= MAP_HEIGHT):
             return
 
-        self._goal_pose_item.setVisible(False)
         self._goal_unreachable_item.setVisible(False)
 
         pos = self._plot_viewbox.mapSceneToView(ev.scenePos())
@@ -192,9 +191,11 @@ class MainWindow(QMainWindow):
 
         self._pressed_pose_item.setVisible(False)
         self._trajectory_item.setVisible(False)
+        self._clear_global_planner_display_segments()
 
         if self._ui.set_pose_button.isChecked():
             self.set_state.emit(state)
+            self._goal_pose_item.setVisible(False)
         elif self._ui.set_goal_button.isChecked():
             self.set_goal.emit(self._measured_state, state, self._obstacles)
             self._goal_pose_item.set_state(state)
@@ -213,11 +214,14 @@ class MainWindow(QMainWindow):
         self._plot_widget.addItem(item)
         self._global_planner_segments_items.append(item)
 
-    @Slot(np.ndarray)
-    def _update_trajectory(self, trajectory: Optional[np.ndarray]) -> None:
+    def _clear_global_planner_display_segments(self) -> None:
         for item in self._global_planner_segments_items:
             self._plot_widget.removeItem(item)
         self._global_planner_segments_items.clear()
+
+    @Slot(np.ndarray)
+    def _update_trajectory(self, trajectory: Optional[np.ndarray]) -> None:
+        self._clear_global_planner_display_segments()
 
         if trajectory is not None:
             self._trajectory_item.setData(*trajectory.T[:2])
