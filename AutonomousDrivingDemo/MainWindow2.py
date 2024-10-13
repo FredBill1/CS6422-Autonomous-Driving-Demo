@@ -136,12 +136,16 @@ class MainWindow(QMainWindow):
         self._goal_unreachable_item.setFont(font)
         self._goal_unreachable_item.setVisible(False)
         self._plot_widget.addItem(self._goal_unreachable_item)
+        self._local_trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("g"))
+        self._plot_widget.addItem(self._local_trajectory_item)
+        self._reference_points_item = pg.ScatterPlotItem(size=10, symbol="x", pen=pg.mkPen("r"))
+        self._plot_widget.addItem(self._reference_points_item)
 
         self._global_planner_node = GlobalPlannerNode(
             segment_collection_size=GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE,
         )
         self._global_planner_segments_items: list[pg.PlotCurveItem] = []
-        self._trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("b", width=2))
+        self._trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("b"))
         self._trajectory_item.setVisible(False)
         self._plot_widget.addItem(self._trajectory_item)
 
@@ -164,8 +168,8 @@ class MainWindow(QMainWindow):
         self._global_planner_node.trajectory.connect(self._local_planner_node.set_trajectory)
         self._global_planner_node.trajectory.connect(self._update_trajectory)
         self._local_planner_node.control_sequence.connect(self._car_simulation_node.set_control_sequence)
-        # self._local_planner_node.local_trajectory.connect(self._update_local_trajectory)
-        # self._local_planner_node.reference_points.connect(self._update_reference_points)
+        self._local_planner_node.local_trajectory.connect(self._update_local_trajectory)
+        self._local_planner_node.reference_points.connect(self._update_reference_points)
         self.canceled.connect(self._car_simulation_node.stop)
         self.canceled.connect(self._global_planner_node.cancel)
         self.canceled.connect(self._local_planner_node.cancel)
@@ -258,6 +262,18 @@ class MainWindow(QMainWindow):
         self._car_simulation_stopped = True
         self.canceled.emit()
         self._clear_global_planner_display_segments()
-        # self._clear_artists(self._local_trajectory_artist)
-        # self._clear_artists(self._reference_points_artist)
+        self._local_trajectory_item.setData([], [])
+        self._reference_points_item.setData([], [])
         self._goal_unreachable_item.setVisible(False)
+
+    @Slot(np.ndarray)
+    def _update_local_trajectory(self, local_trajectory: npt.NDArray[np.floating[Any]]) -> None:
+        if self._car_simulation_stopped:
+            return
+        self._local_trajectory_item.setData(*local_trajectory.T)
+
+    @Slot(np.ndarray)
+    def _update_reference_points(self, reference_points: npt.NDArray[np.floating[Any]]) -> None:
+        if self._car_simulation_stopped:
+            return
+        self._reference_points_item.setData(*reference_points.T)
