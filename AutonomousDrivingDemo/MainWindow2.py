@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
         self._ui = Ui_MainWindow()
         self._ui.setupUi(self)
 
-        self._plot_viewbox = _CustomViewBox()
+        self._plot_viewbox = _CustomViewBox(enableMenu=False)
         self._plot_widget = pg.PlotWidget(viewBox=self._plot_viewbox, title="Timestamp: 0.0s")
         self._plot_widget.setAspectLocked()
         self._plot_widget.addItem(pg.GridItem())
