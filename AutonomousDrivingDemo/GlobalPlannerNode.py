@@ -2,10 +2,8 @@ import multiprocessing as mp
 from multiprocessing.connection import Connection
 from typing import Any, Optional
 
-import matplotlib.colors as mcolors
 import numpy as np
 import numpy.typing as npt
-from matplotlib.collections import LineCollection
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 from .global_planner.hybrid_a_star import Node, hybrid_a_star

@@ -156,6 +156,8 @@ class MainWindow(QMainWindow):
         self._trajectory_item.setVisible(False)
         self._plot_widget.addItem(self._trajectory_item)
 
+        self._plot_viewbox.disableAutoRange()
+
     @Slot()
     def cancel(self):
         self._car_simulation_stopped = True
@@ -170,6 +172,7 @@ class MainWindow(QMainWindow):
             return
 
         self._goal_pose_item.setVisible(False)
+        self._goal_unreachable_item.setVisible(False)
 
         pos = self._plot_viewbox.mapSceneToView(ev.scenePos())
         x, y = pos.x(), pos.y()
@@ -185,6 +188,7 @@ class MainWindow(QMainWindow):
             return
 
         self._pressed_pose_item.setVisible(False)
+        self._trajectory_item.setVisible(False)
 
         if self._ui.set_pose_button.isChecked():
             self.set_state.emit(state)
@@ -196,11 +200,15 @@ class MainWindow(QMainWindow):
 
     @Slot(list)
     def _update_global_planner_display_segments(self, display_segments: list[npt.NDArray[np.floating[Any]]]) -> None:
-        # TODO: not efficient
-        for i, segment in enumerate(display_segments):
-            item = pg.PlotCurveItem(*segment.T, pen=pg.mkPen(i, len(display_segments) * 1.3))
-            self._plot_widget.addItem(item)
-            self._global_planner_segments_items.append(item)
+        connects = [np.ones(len(segment), dtype=bool) for segment in display_segments]
+        for i in range(len(connects) - 1):
+            connects[i][-1] = False
+        connects = np.concatenate(connects)
+        segments = np.vstack(display_segments)
+        pen = pg.mkPen(len(self._global_planner_segments_items), 16)
+        item = pg.PlotCurveItem(*segments.T, pen=pen, skipFiniteCheck=True, connect=connects)
+        self._plot_widget.addItem(item)
+        self._global_planner_segments_items.append(item)
 
     @Slot(np.ndarray)
     def _update_trajectory(self, trajectory: Optional[np.ndarray]) -> None:
