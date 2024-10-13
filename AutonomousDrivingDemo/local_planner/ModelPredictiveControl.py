@@ -21,7 +21,7 @@ DU_TH = 0.1  # iteration finish param
 
 # mpc parameters
 R = np.diag([0.01, 0.005])  # input cost matrix
-R_D = np.diag([0.01, 1.0])  # input difference cost matrix
+R_D = np.diag([1e-5, 10.0])  # input difference cost matrix
 Q = np.diag([1.1, 1.1, 0.05, 1.1])  # state cost matrix
 Q_F = Q * 2  # state final matrix
 
@@ -113,7 +113,7 @@ def _linear_mpc_control(
 
     for t in range(1, HORIZON_LENGTH):
         # prefer control difference between two steps to be small
-        cost += cvxpy.quad_form(u[:, t] - u[:, t - 1], R_D)
+        cost += cvxpy.quad_form((u[:, t] - u[:, t - 1]) / dt, R_D)
 
         # make sure steer change is within the maximum steer speed
         constraints.append(cvxpy.abs(u[1, t] - u[1, t - 1]) <= Car.MAX_STEER_SPEED * dt)
