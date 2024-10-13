@@ -7,8 +7,6 @@ from ..modeling.Car import Car
 
 
 class CarItem(pg.GraphicsObject):
-    RADIUS = np.hypot(Car.WIDTH / 2, Car.LENGTH - Car.BACK_TO_WHEEL)
-
     def __init__(self, car: Car, color=None):
         super().__init__()
         if color is None:
@@ -40,6 +38,9 @@ class CarItem(pg.GraphicsObject):
         self._items = [outline, fl_wheel, fr_wheel, rl_wheel, rr_wheel]
         for i, x in enumerate(self._items):
             self._items[i] = (rot1 @ x.T).T + [car.x, car.y]
+        points = np.concatenate(self._items)
+        minx, miny, maxx, maxy = points[:, 0].min(), points[:, 1].min(), points[:, 0].max(), points[:, 1].max()
+        self._bounding_rect = pg.QtCore.QRectF(minx, miny, maxx - minx, maxy - miny)
         self.update()
 
     def set_color(self, color: str) -> None:
@@ -55,4 +56,4 @@ class CarItem(pg.GraphicsObject):
 
     @override
     def boundingRect(self) -> pg.QtCore.QRectF:
-        return pg.QtCore.QRectF(self._car.x - self.RADIUS, self._car.y - self.RADIUS, 2 * self.RADIUS, 2 * self.RADIUS)
+        return self._bounding_rect
