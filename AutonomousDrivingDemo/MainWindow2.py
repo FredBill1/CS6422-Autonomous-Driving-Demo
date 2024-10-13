@@ -115,8 +115,8 @@ class MainWindow(QMainWindow):
         self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
 
         self._plot_widget = pg.PlotWidget(viewBox=self._plot_viewbox, title="Timestamp: 0.0s")
-        self._visualization_dock = Dock("Visualization", size=(500, 500))
-        self._ui.dockarea.addDock(self._visualization_dock)
+        self._visualization_dock = Dock("Visualization", size=(4, 2))
+        self._ui.dockarea.addDock(self._visualization_dock, "left")
         self._visualization_dock.addWidget(self._plot_widget)
         self._plot_widget.setAspectLocked()
         self._plot_widget.addItem(pg.GridItem())
@@ -143,6 +143,25 @@ class MainWindow(QMainWindow):
         self._plot_widget.addItem(self._local_trajectory_item)
         self._reference_points_item = pg.ScatterPlotItem(size=10, symbol="x", pen=pg.mkPen("r"))
         self._plot_widget.addItem(self._reference_points_item)
+        self._velocity_plot_widget = pg.PlotWidget(title="Velocity")
+        self._velocity_plot_dock = Dock("Velocity", size=(2, 2))
+        self._ui.dockarea.addDock(self._velocity_plot_dock, "right", self._visualization_dock)
+        self._velocity_plot_dock.addWidget(self._velocity_plot_widget)
+        self._velocity_plot_widget.disableAutoRange(axis=pg.ViewBox.YAxis)
+        self._velocity_plot_widget.setYRange(Car.MIN_SPEED * 3.6, Car.MAX_SPEED * 3.6)
+        self._velocity_plot_widget.addItem(pg.GridItem())
+        self._steer_plot_widget = pg.PlotWidget(title="Steer")
+        self._steer_plot_dock = Dock("Steer", size=(2, 2))
+        self._ui.dockarea.addDock(self._steer_plot_dock, "bottom", self._velocity_plot_dock)
+        self._steer_plot_dock.addWidget(self._steer_plot_widget)
+        self._steer_plot_widget.disableAutoRange(axis=pg.ViewBox.YAxis)
+        self._steer_plot_widget.setYRange(-np.rad2deg(Car.MAX_STEER), np.rad2deg(Car.MAX_STEER))
+        self._steer_plot_widget.addItem(pg.GridItem())
+
+        self._velocity_plot_item = pg.PlotCurveItem(pen=pg.mkPen("y"))
+        self._velocity_plot_widget.addItem(self._velocity_plot_item)
+        self._steer_plot_item = pg.PlotCurveItem(pen=pg.mkPen("g"))
+        self._steer_plot_widget.addItem(self._steer_plot_item)
 
         self._global_planner_node = GlobalPlannerNode(
             segment_collection_size=GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE,
@@ -258,6 +277,11 @@ class MainWindow(QMainWindow):
         self._measured_timestamps.append(timestamp_s)
         self._measured_velocities.append(state.velocity * 3.6)  # m/s -> km/h
         self._measured_steers.append(np.rad2deg(state.steer))
+        timestamps = np.array(self._measured_timestamps)
+        velocities = np.array(self._measured_velocities)
+        steers = np.array(self._measured_steers)
+        self._velocity_plot_item.setData(timestamps, velocities)
+        self._steer_plot_item.setData(timestamps, steers)
         self._measured_state_item.set_state(state)
         self._plot_widget.setTitle(f"Timestamp: {timestamp_s:.2f}s")
 
