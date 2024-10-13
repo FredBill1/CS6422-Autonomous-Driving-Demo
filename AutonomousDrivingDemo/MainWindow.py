@@ -105,11 +105,11 @@ class MainWindow(QMainWindow):
         self._plot_widget.setAspectLocked()
         self._plot_widget.addItem(pg.GridItem())
 
-        self._velocity_plot_widget = pg.PlotWidget(title="Velocity")
+        self._velocity_plot_widget = pg.PlotWidget(title="Velocity 0.0km/h")
         self._velocity_plot_widget.disableAutoRange(axis=pg.ViewBox.YAxis)
         self._velocity_plot_widget.setYRange(Car.MIN_SPEED * 3.6, Car.MAX_SPEED * 3.6)
         self._velocity_plot_widget.addItem(pg.GridItem())
-        self._steer_plot_widget = pg.PlotWidget(title="Steer")
+        self._steer_plot_widget = pg.PlotWidget(title="Steer 0.0°")
         self._steer_plot_widget.disableAutoRange(axis=pg.ViewBox.YAxis)
         self._steer_plot_widget.setYRange(-np.rad2deg(Car.MAX_STEER), np.rad2deg(Car.MAX_STEER))
         self._steer_plot_widget.addItem(pg.GridItem())
@@ -286,6 +286,8 @@ class MainWindow(QMainWindow):
         self._steer_plot_item.setData(timestamps, steers)
         self._measured_state_item.set_state(state)
         self._plot_widget.setTitle(f"Timestamp: {timestamp_s:.2f}s")
+        self._velocity_plot_widget.setTitle(f"Velocity {state.velocity * 3.6:.2f}km/h")
+        self._steer_plot_widget.setTitle(f"Steer {np.rad2deg(state.steer):.2f}°")
 
     @Slot(np.ndarray)
     def _update_local_trajectory(self, local_trajectory: npt.NDArray[np.floating[Any]]) -> None:
