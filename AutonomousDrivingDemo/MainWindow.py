@@ -3,7 +3,7 @@ import PySide6
 "set PySide6 backend"
 
 from collections import deque
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 import numpy as np
 import numpy.typing as npt
@@ -71,6 +71,7 @@ def _get_random_car(obstacles: Obstacles) -> Car:
 class _CustomViewBox(pg.ViewBox):
     sigMouseDrag = Signal(MouseDragEvent)
 
+    @override
     def mouseDragEvent(self, ev: MouseDragEvent) -> None:
         if ev.button() != Qt.MouseButton.LeftButton:
             return super().mouseDragEvent(ev)
