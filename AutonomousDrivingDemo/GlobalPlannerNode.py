@@ -35,7 +35,7 @@ def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
             return False
 
         trajectory = hybrid_a_star(*data, callback)
-        if not canceled:
+        if not (canceled or pipe.poll()):
             pipe.send(trajectory)
 
 

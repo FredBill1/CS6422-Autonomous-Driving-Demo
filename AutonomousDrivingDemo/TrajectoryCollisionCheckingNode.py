@@ -42,4 +42,3 @@ class TrajectoryCollisionCheckingNode(QObject):
             return
         if self._checker.check(Obstacles(obstacle_coordinates)):
             self.collided.emit()
-            self._checker = None
