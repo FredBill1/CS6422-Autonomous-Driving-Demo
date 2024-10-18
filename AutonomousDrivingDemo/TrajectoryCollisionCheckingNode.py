@@ -8,6 +8,8 @@ from scipy.spatial import KDTree
 from .modeling.Car import Car
 from .modeling.Obstacles import Obstacles
 
+DISCARD_FIRST_N = 5
+
 
 class TrajectoryCollisionChecker:
     def __init__(self, trajectory: npt.NDArray[np.floating[Any]]) -> None:
@@ -38,7 +40,7 @@ class TrajectoryCollisionCheckingNode(QObject):
         if trajectory is None:
             self._checker = None
             return
-        self._checker = TrajectoryCollisionChecker(trajectory[:, :3])
+        self._checker = TrajectoryCollisionChecker(trajectory[DISCARD_FIRST_N:, :3])
         if self._known_obstacles is None:
             return
         self.check_collision(self._known_obstacles)
