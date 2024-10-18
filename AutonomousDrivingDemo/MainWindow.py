@@ -23,6 +23,7 @@ from .modeling.Car import Car
 from .modeling.Obstacles import Obstacles
 from .plotting.CarItem import CarItem
 from .ui.mainwindow_ui import Ui_MainWindow
+from .TrajectoryCollisionCheckingNode import TrajectoryCollisionCheckingNode
 
 GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE = 50
 
@@ -145,6 +146,7 @@ class MainWindow(QMainWindow):
             delta_time_s=LOCAL_PLANNER_DELTA_TIME,
             update_interval_s=LOCAL_PLANNER_UPDATE_INTERVAL,
         )
+        self._trajectory_collision_checking_node = TrajectoryCollisionCheckingNode()
 
         # connect signals
         self._car_simulation_node.measured_state.connect(self._local_planner_node.set_state)
@@ -153,11 +155,14 @@ class MainWindow(QMainWindow):
         self._global_planner_node.display_segments.connect(self._update_global_planner_display_segments)
         self._global_planner_node.finished.connect(self._car_simulation_node.resume)
         self._global_planner_node.trajectory.connect(self._local_planner_node.set_trajectory)
+        self._global_planner_node.trajectory.connect(self._trajectory_collision_checking_node.set_trajectory)
         self._global_planner_node.trajectory.connect(self._update_trajectory)
         self._local_planner_node.control_sequence.connect(self._car_simulation_node.set_control_sequence)
         self._local_planner_node.local_trajectory.connect(self._update_local_trajectory)
         self._local_planner_node.reference_points.connect(self._update_reference_points)
         self._map_server_node.known_obstacle_coordinates_updated.connect(self._update_known_obstacle_coordinates)
+        self._map_server_node.new_obstacle_coordinates.connect(self._trajectory_collision_checking_node.check_collision)
+        self._trajectory_collision_checking_node.collided.connect(lambda: print("Collided"))
         self.canceled.connect(self._car_simulation_node.stop)
         self.canceled.connect(self._global_planner_node.cancel)
         self.canceled.connect(self._local_planner_node.cancel)
