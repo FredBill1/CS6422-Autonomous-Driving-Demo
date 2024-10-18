@@ -29,10 +29,10 @@
       <item>
        <widget class="QPushButton" name="set_goal_button">
         <property name="text">
-         <string>Set Goal(Z)</string>
+         <string>Set Goal(A)</string>
         </property>
         <property name="shortcut">
-         <string>Z</string>
+         <string>A</string>
         </property>
         <property name="checkable">
          <bool>true</bool>
@@ -48,10 +48,10 @@
       <item>
        <widget class="QPushButton" name="set_pose_button">
         <property name="text">
-         <string>Set Pose(X)</string>
+         <string>Set Pose(S)</string>
         </property>
         <property name="shortcut">
-         <string>X</string>
+         <string>S</string>
         </property>
         <property name="checkable">
          <bool>true</bool>
@@ -64,20 +64,20 @@
       <item>
        <widget class="QPushButton" name="cancel_button">
         <property name="text">
-         <string>Cancel(C)</string>
+         <string>Cancel(D)</string>
         </property>
         <property name="shortcut">
-         <string>C</string>
+         <string>D</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="restart_button">
         <property name="text">
-         <string>Restart(R)</string>
+         <string>Restart(F)</string>
         </property>
         <property name="shortcut">
-         <string>R</string>
+         <string>F</string>
         </property>
        </widget>
       </item>
