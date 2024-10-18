@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
         # prepare data
         self._map_server_node = MapServerNode()
         self._measured_state = self._map_server_node.generate_random_initial_state()
+        self._goal_state = self._measured_state.copy()
         self._measured_timestamp = 0.0
         self._measured_velocities: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
@@ -163,6 +164,7 @@ class MainWindow(QMainWindow):
         self._map_server_node.known_obstacle_coordinates_updated.connect(self._update_known_obstacle_coordinates)
         self._map_server_node.new_obstacle_coordinates.connect(self._trajectory_collision_checking_node.check_collision)
         self._trajectory_collision_checking_node.collided.connect(self._local_planner_node.brake)
+        self._trajectory_collision_checking_node.collided.connect(self._trajectory_collided)
         self.canceled.connect(self._car_simulation_node.stop)
         self.canceled.connect(self._global_planner_node.cancel)
         self.canceled.connect(self._local_planner_node.cancel)
@@ -214,10 +216,17 @@ class MainWindow(QMainWindow):
             self.set_state.emit(state)
             self._goal_pose_item.setVisible(False)
         elif self._ui.set_goal_button.isChecked():
+            self._goal_state = state
             self.set_goal.emit(self._measured_state, state, Obstacles(self._map_server_node.known_obstacle_coordinates))
             self._goal_pose_item.set_state(state)
             self._goal_pose_item.setVisible(True)
             self._goal_unreachable_item.setPos(start_x, start_y)
+
+    @Slot()
+    def _trajectory_collided(self) -> None:
+        self.set_goal.emit(
+            self._measured_state, self._goal_state, Obstacles(self._map_server_node.known_obstacle_coordinates)
+        )
 
     @Slot(list)
     def _update_global_planner_display_segments(self, display_segments: list[npt.NDArray[np.floating[Any]]]) -> None:
