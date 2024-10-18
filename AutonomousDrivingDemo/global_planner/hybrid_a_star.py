@@ -99,6 +99,8 @@ def hybrid_a_star(
     if Car(*goal).check_collision(obstacles):
         return None
 
+    start_collided = Car(*start).check_collision(obstacles)
+
     # Downsample the obstacle map to a grid
     obstacle_grid = obstacles.downsampling_to_grid(
         XY_GRID_RESOLUTION, min(Car.COLLISION_LENGTH, Car.COLLISION_WIDTH) / 2
@@ -121,6 +123,7 @@ def hybrid_a_star(
 
     def generate_neighbour(cur: Node, direction: int, steer: float) -> Optional[Node]:
         "Generate a neighbour node of the current node, given the direction and steer angle"
+        print(start_collided)
 
         # Simulate the car movement for MOTION_DISTANCE, with a interval of MOTION_RESOLUTION,
         # check if the car will collide with the obstacles during the movement
@@ -128,7 +131,7 @@ def hybrid_a_star(
         trajectory = []
         for _ in range(int(MOTION_DISTANCE / MOTION_RESOLUTION)):
             car.update(MOTION_RESOLUTION)
-            if car.check_collision(obstacles):
+            if not start_collided and car.check_collision(obstacles):
                 return None
             trajectory.append([car.x, car.y, car.yaw])
 
@@ -155,9 +158,11 @@ def hybrid_a_star(
 
     def generate_neighbours(cur: Node) -> Generator[Node, None, None]:
         "Generate all possible neighbours of the current node"
+        nonlocal start_collided
         for direction, steer in product([1, -1], STEER_COMMANDS):
             if (res := generate_neighbour(cur, direction, steer)) is not None:
                 yield res
+        start_collided = False
 
     def generate_rspath(node: Node) -> Optional[Node]:
         """
