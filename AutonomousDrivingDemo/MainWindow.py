@@ -161,6 +161,9 @@ class MainWindow(QMainWindow):
         self._local_planner_node.reference_points.connect(self._update_reference_points)
         self._map_server_node.inited.connect(self._car_simulation_node.set_state)
         self._map_server_node.inited.connect(self._inited)
+        self._map_server_node.known_obstacle_coordinates_updated.connect(
+            self._trajectory_collision_checking_node.set_known_obstacles
+        )
         self._map_server_node.known_obstacle_coordinates_updated.connect(self._update_known_obstacle_coordinates)
         self._map_server_node.new_obstacle_coordinates.connect(self._trajectory_collision_checking_node.check_collision)
         self._trajectory_collision_checking_node.collided.connect(self._local_planner_node.brake)

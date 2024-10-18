@@ -31,10 +31,21 @@ class TrajectoryCollisionCheckingNode(QObject):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._checker: Optional[TrajectoryCollisionChecker] = None
+        self._known_obstacles: Optional[npt.NDArray[np.floating[Any]]] = None
 
     @Slot(np.ndarray)
     def set_trajectory(self, trajectory: Optional[npt.NDArray[np.floating[Any]]]) -> None:
-        self._checker = TrajectoryCollisionChecker(trajectory[:, :3]) if trajectory is not None else None
+        if trajectory is None:
+            self._checker = None
+            return
+        self._checker = TrajectoryCollisionChecker(trajectory[:, :3])
+        if self._known_obstacles is None:
+            return
+        self.check_collision(self._known_obstacles)
+
+    @Slot(np.ndarray)
+    def set_known_obstacles(self, known_obstacles) -> None:
+        self._known_obstacles = known_obstacles
 
     @Slot(np.ndarray)
     def check_collision(self, obstacle_coordinates: npt.NDArray[np.floating[Any]]) -> None:
