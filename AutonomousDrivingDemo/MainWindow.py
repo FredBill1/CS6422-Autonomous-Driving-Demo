@@ -162,7 +162,7 @@ class MainWindow(QMainWindow):
         self._local_planner_node.reference_points.connect(self._update_reference_points)
         self._map_server_node.known_obstacle_coordinates_updated.connect(self._update_known_obstacle_coordinates)
         self._map_server_node.new_obstacle_coordinates.connect(self._trajectory_collision_checking_node.check_collision)
-        self._trajectory_collision_checking_node.collided.connect(lambda: print("Collided"))
+        self._trajectory_collision_checking_node.collided.connect(self._local_planner_node.brake)
         self.canceled.connect(self._car_simulation_node.stop)
         self.canceled.connect(self._global_planner_node.cancel)
         self.canceled.connect(self._local_planner_node.cancel)

@@ -47,6 +47,8 @@ class LocalPlannerNode(QObject):
         self._update_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._update_timer.setInterval(int(update_interval_s * 1000))
 
+        self._brake = False
+
     @Slot()
     def start(self) -> None:
         self._worker.start()
@@ -61,6 +63,11 @@ class LocalPlannerNode(QObject):
     @Slot(np.ndarray)
     def set_trajectory(self, trajectory: npt.NDArray[np.floating[Any]]) -> None:
         self._parent_pipe.send(trajectory)
+        self._brake = False
+
+    @Slot()
+    def brake(self) -> None:
+        self._brake = True
 
     @Slot()
     def cancel(self) -> None:
@@ -77,7 +84,10 @@ class LocalPlannerNode(QObject):
             return
         timestamp_s, state, result = data
         timestamps = np.arange(len(result.controls)) * self._delta_time_s + timestamp_s
-        velocities = state.velocity + np.cumsum(result.controls[:, 0] * self._delta_time_s)
+        if not self._brake:
+            velocities = state.velocity + np.cumsum(result.controls[:, 0] * self._delta_time_s)
+        else:
+            velocities = np.zeros_like(result.controls[:, 0])
         steers = result.controls[:, 1]
         control_sequence = np.column_stack((timestamps, velocities, steers))
         self.control_sequence.emit(control_sequence)
