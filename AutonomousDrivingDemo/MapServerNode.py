@@ -66,6 +66,8 @@ class MapServerNode(QObject):
 
     def _lidar_scan(self, x: float, y: float) -> None:
         ids = np.array(self._unknown_obstacles.kd_tree.query_ball_point((x, y), Car.SCAN_RADIUS))
+        if ids.size == 0:
+            return
         ids: np.ndarray = ids[self._havent_discovered[ids]]
         if ids.size == 0:
             return
