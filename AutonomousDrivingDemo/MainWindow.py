@@ -39,7 +39,7 @@ MAP_STEP = 1.0
 MAP_NUM_RANDOM_OBSTACLES = 40
 
 
-def _get_test_obstacles() -> Obstacles:
+def _gen_known_obstacle_coordnates() -> npt.NDArray[np.floating[Any]]:
     ox = [
         np.arange(0, MAP_WIDTH, MAP_STEP),
         np.full(np.ceil(MAP_HEIGHT / MAP_STEP).astype(int), MAP_WIDTH),
@@ -47,7 +47,6 @@ def _get_test_obstacles() -> Obstacles:
         np.full(np.ceil(MAP_HEIGHT / MAP_STEP).astype(int) + 1, 0.0),
         np.full(np.ceil(MAP_WIDTH / 3 * 2 / MAP_STEP).astype(int), MAP_WIDTH / 3),
         np.full(np.ceil(MAP_HEIGHT / 3 * 2 / MAP_STEP).astype(int), 2 * MAP_WIDTH / 3),
-        np.random.uniform(0, MAP_WIDTH, MAP_NUM_RANDOM_OBSTACLES),
     ]
     oy = [
         np.full(np.ceil(MAP_WIDTH / MAP_STEP).astype(int), 0.0),
@@ -56,12 +55,15 @@ def _get_test_obstacles() -> Obstacles:
         np.arange(0, MAP_HEIGHT + MAP_STEP, MAP_STEP),
         np.arange(0, MAP_WIDTH / 3 * 2, MAP_STEP),
         MAP_HEIGHT - np.arange(0, MAP_HEIGHT / 3 * 2, MAP_STEP),
-        np.random.uniform(0, MAP_HEIGHT, MAP_NUM_RANDOM_OBSTACLES),
     ]
-    return Obstacles(np.vstack((np.concatenate(ox), np.concatenate(oy))).T)
+    return np.vstack((np.concatenate(ox), np.concatenate(oy))).T
 
 
-def _get_random_car(obstacles: Obstacles) -> Car:
+def _gen_unknown_obstacle_coordnates() -> npt.NDArray[np.floating[Any]]:
+    return np.random.uniform((0, 0), (MAP_WIDTH, MAP_HEIGHT), (MAP_NUM_RANDOM_OBSTACLES, 2))
+
+
+def _gen_random_car(obstacles: Obstacles) -> Car:
     state = np.random.uniform((0, 0, -np.pi), (MAP_WIDTH, MAP_HEIGHT, np.pi))
     while Car(*state).check_collision(obstacles):
         state = np.random.uniform((0, 0, -np.pi), (MAP_WIDTH, MAP_HEIGHT, np.pi))
@@ -88,8 +90,11 @@ class MainWindow(QMainWindow):
         super().__init__(*args, **kwargs)
 
         # prepare data
-        self._obstacles = _get_test_obstacles()
-        self._measured_state = _get_random_car(self._obstacles)
+        self._known_obstacle_coordinates = _gen_known_obstacle_coordnates()
+        self._unknown_obstacle_coordinates = _gen_unknown_obstacle_coordnates()
+        self._measured_state = _gen_random_car(
+            Obstacles(np.vstack((self._known_obstacle_coordinates, self._unknown_obstacle_coordinates)))
+        )
         self._measured_timestamp = 0.0
         self._measured_velocities: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
@@ -126,8 +131,11 @@ class MainWindow(QMainWindow):
         self._ui.dockarea.addDock(self._steer_plot_dock, "bottom", self._velocity_plot_dock)
 
         # graphics items
-        self._obstacle_item = pg.ScatterPlotItem(
-            *self._obstacles.coordinates.T, size=5, symbol="o", pen=None, brush=(255, 0, 0)
+        self._known_obstacles_item = pg.ScatterPlotItem(
+            *self._known_obstacle_coordinates.T, size=5, symbol="o", pen=None, brush=(255, 0, 0)
+        )
+        self._unknown_obstacles_item = pg.ScatterPlotItem(
+            *self._unknown_obstacle_coordinates.T, size=5, symbol="o", pen=None, brush=(0, 255, 255)
         )
         self._measured_state_item = CarItem(self._measured_state, color="w", with_lidar=True)
         self._pressed_pose_item = CarItem(self._measured_state, color="g")
@@ -144,7 +152,8 @@ class MainWindow(QMainWindow):
         self._global_planner_segments_items: list[pg.PlotCurveItem] = []
         self._trajectory_item = pg.PlotCurveItem(pen=pg.mkPen("c"))
         self._trajectory_item.setVisible(False)
-        self._plot_widget.addItem(self._obstacle_item)
+        self._plot_widget.addItem(self._known_obstacles_item)
+        self._plot_widget.addItem(self._unknown_obstacles_item)
         self._plot_widget.addItem(self._trajectory_item)
         self._plot_widget.addItem(self._measured_state_item)
         self._plot_widget.addItem(self._goal_pose_item)
@@ -235,7 +244,7 @@ class MainWindow(QMainWindow):
             self.set_state.emit(state)
             self._goal_pose_item.setVisible(False)
         elif self._ui.set_goal_button.isChecked():
-            self.set_goal.emit(self._measured_state, state, self._obstacles)
+            self.set_goal.emit(self._measured_state, state, Obstacles(self._known_obstacle_coordinates))
             self._goal_pose_item.set_state(state)
             self._goal_pose_item.setVisible(True)
             self._goal_unreachable_item.setPos(start_x, start_y)
