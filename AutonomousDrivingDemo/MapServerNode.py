@@ -47,6 +47,7 @@ class MapServerNode(QObject):
         self._unknown_obstacles = Obstacles(self._unknown_obstacle_coordinates)
         self._havent_discovered = np.ones(len(self._unknown_obstacle_coordinates), dtype=bool)
         self.inited.emit(self._generate_random_initial_state())
+        self.known_obstacle_coordinates_updated.emit(self._known_obstacle_coordinates)
 
     @property
     def known_obstacle_coordinates(self) -> npt.NDArray[np.floating[Any]]:

@@ -36,6 +36,8 @@ LOCAL_PLANNER_UPDATE_INTERVAL = 0.2
 
 DASHBOARD_HISTORY_SIZE = 250
 
+REPLAN_REFERENCE_NUM = 2
+
 
 class _CustomViewBox(pg.ViewBox):
     sigMouseDrag = Signal(MouseDragEvent)
@@ -243,7 +245,7 @@ class MainWindow(QMainWindow):
     def _trajectory_collided(self) -> None:
         self._trajectory_item.setVisible(False)
         if self._local_trajectory is not None:
-            state = Car(*self._local_trajectory[len(self._local_trajectory) // 2, :3])
+            state = Car(*self._local_trajectory[REPLAN_REFERENCE_NUM])
         else:
             state = self._measured_state
         self.set_goal.emit(state, self._goal_state, Obstacles(self._map_server_node.known_obstacle_coordinates))
