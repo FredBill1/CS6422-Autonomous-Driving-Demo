@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 import numpy as np
 import numpy.typing as npt
-from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Signal, Slot
 
 from .constants import MAP_HEIGHT, MAP_NUM_RANDOM_OBSTACLES, MAP_STEP, MAP_WIDTH
 from .modeling.Car import Car
@@ -36,13 +36,17 @@ def _generate_unknown_obstacle_coordnates() -> npt.NDArray[np.floating[Any]]:
 class MapServerNode(QObject):
     known_obstacle_coordinates_updated = Signal(np.ndarray)
     new_obstacle_coordinates = Signal(np.ndarray)
+    inited = Signal(Car)
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
+
+    def init(self) -> None:
         self._known_obstacle_coordinates = _generate_known_obstacle_coordnates()
         self._unknown_obstacle_coordinates = _generate_unknown_obstacle_coordnates()
         self._unknown_obstacles = Obstacles(self._unknown_obstacle_coordinates)
         self._havent_discovered = np.ones(len(self._unknown_obstacle_coordinates), dtype=bool)
+        self.inited.emit(self._generate_random_initial_state())
 
     @property
     def known_obstacle_coordinates(self) -> npt.NDArray[np.floating[Any]]:
@@ -52,7 +56,7 @@ class MapServerNode(QObject):
     def unknown_obstacle_coordinates(self) -> npt.NDArray[np.floating[Any]]:
         return self._unknown_obstacle_coordinates
 
-    def generate_random_initial_state(self) -> Car:
+    def _generate_random_initial_state(self) -> Car:
         obstacles = Obstacles(np.vstack((self._known_obstacle_coordinates, self._unknown_obstacle_coordinates)))
         state = np.random.uniform((0, 0, -np.pi), (MAP_WIDTH, MAP_HEIGHT, np.pi))
         while Car(*state).check_collision(obstacles):

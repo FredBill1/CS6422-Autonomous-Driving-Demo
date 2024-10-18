@@ -1,4 +1,4 @@
-from typing import override
+from typing import Optional, override
 
 import numpy as np
 import pyqtgraph as pg
@@ -9,7 +9,7 @@ from ..modeling.Car import Car
 class CarItem(pg.GraphicsObject):
     LIDAR_BOUNDING_RECT = pg.QtCore.QRectF(-Car.SCAN_RADIUS, -Car.SCAN_RADIUS, 2 * Car.SCAN_RADIUS, 2 * Car.SCAN_RADIUS)
 
-    def __init__(self, car: Car, *, color=None, with_lidar: bool = False) -> None:
+    def __init__(self, car: Optional[Car], *, color=None, with_lidar: bool = False) -> None:
         super().__init__()
         if color is None:
             color = pg.mkQApp().palette().color(pg.QtGui.QPalette.ColorRole.WindowText)
@@ -17,9 +17,12 @@ class CarItem(pg.GraphicsObject):
         self._with_lidar = with_lidar
         self.set_state(car)
 
-    def set_state(self, car: Car) -> None:
-        self.prepareGeometryChange()
+    def set_state(self, car: Optional[Car]) -> None:
         self._car = car
+        if car is None:
+            return
+
+        self.prepareGeometryChange()
 
         # Outline and wheels geometry
         BOX = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1], [-1, -1]]) / 2
@@ -55,6 +58,8 @@ class CarItem(pg.GraphicsObject):
 
     @override
     def paint(self, p: pg.QtGui.QPainter, *args) -> None:
+        if self._car is None:
+            return
         p.setPen(pg.mkPen(self._color))
         for item in self._items:
             p.drawPolyline(pg.QtGui.QPolygonF([pg.QtCore.QPointF(x, y) for x, y in item]))
@@ -64,4 +69,4 @@ class CarItem(pg.GraphicsObject):
 
     @override
     def boundingRect(self) -> pg.QtCore.QRectF:
-        return self._bounding_rect
+        return self._bounding_rect if self._car is not None else pg.QtCore.QRectF()

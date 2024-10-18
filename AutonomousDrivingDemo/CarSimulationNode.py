@@ -14,14 +14,13 @@ class CarSimulationNode(QObject):
 
     def __init__(
         self,
-        initial_state: Car,
         delta_time_s: float,
         simulation_interval_s: float,
         simulation_publish_interval_s: float,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
-        self._real_state = initial_state
+        self._real_state: Optional[Car] = None
         self._control_tck: Optional[tuple[npt.NDArray[np.floating[Any]], ...]] = None
         self._control_u: Optional[npt.NDArray[np.floating[Any]]] = None
         self._delta_time_s = delta_time_s
@@ -40,6 +39,8 @@ class CarSimulationNode(QObject):
 
     @Slot()
     def _simulate(self):
+        if self._real_state is None:
+            return
         self._timestamp_s += self._delta_time_s
         if self._control_tck is None:
             self._real_state.update(self._delta_time_s)

@@ -10,7 +10,7 @@ import numpy.typing as npt
 import pyqtgraph as pg
 from pyqtgraph.dockarea.Dock import Dock
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QMainWindow
 
@@ -22,8 +22,8 @@ from .MapServerNode import MapServerNode
 from .modeling.Car import Car
 from .modeling.Obstacles import Obstacles
 from .plotting.CarItem import CarItem
-from .ui.mainwindow_ui import Ui_MainWindow
 from .TrajectoryCollisionCheckingNode import TrajectoryCollisionCheckingNode
+from .ui.mainwindow_ui import Ui_MainWindow
 
 GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE = 50
 
@@ -59,9 +59,8 @@ class MainWindow(QMainWindow):
         super().__init__(*args, **kwargs)
 
         # prepare data
-        self._map_server_node = MapServerNode()
-        self._measured_state = self._map_server_node.generate_random_initial_state()
-        self._goal_state = self._measured_state.copy()
+        self._measured_state: Optional[Car] = None
+        self._goal_state: Optional[Car] = None
         self._measured_timestamp = 0.0
         self._measured_velocities: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
@@ -74,8 +73,10 @@ class MainWindow(QMainWindow):
         self._ui.setupUi(self)
 
         self._plot_viewbox = _CustomViewBox(enableMenu=False)
+        self._plot_viewbox.setXRange(0, MAP_WIDTH)
+        self._plot_viewbox.setYRange(0, MAP_HEIGHT)
+        self._plot_viewbox.setAspectLocked()
         self._plot_widget = pg.PlotWidget(viewBox=self._plot_viewbox, title="Timestamp: 0.0s")
-        self._plot_widget.setAspectLocked()
         self._plot_widget.addItem(pg.GridItem())
 
         self._velocity_plot_widget = pg.PlotWidget(title="Velocity: 0.0km/h")
@@ -99,16 +100,12 @@ class MainWindow(QMainWindow):
         self._ui.dockarea.addDock(self._steer_plot_dock, "bottom", self._velocity_plot_dock)
 
         # graphics items
-        self._known_obstacles_item = pg.ScatterPlotItem(
-            *self._map_server_node.known_obstacle_coordinates.T, size=5, symbol="o", pen=None, brush=(255, 0, 0)
-        )
-        self._unknown_obstacles_item = pg.ScatterPlotItem(
-            *self._map_server_node.unknown_obstacle_coordinates.T, size=5, symbol="o", pen=None, brush=(0, 255, 255)
-        )
-        self._measured_state_item = CarItem(self._measured_state, color="w", with_lidar=True)
-        self._pressed_pose_item = CarItem(self._measured_state, color="g")
+        self._known_obstacles_item = pg.ScatterPlotItem(size=5, symbol="o", pen=None, brush=(255, 0, 0))
+        self._unknown_obstacles_item = pg.ScatterPlotItem(size=5, symbol="o", pen=None, brush=(0, 255, 255))
+        self._measured_state_item = CarItem(None, color="w", with_lidar=True)
+        self._pressed_pose_item = CarItem(None, color="g")
         self._pressed_pose_item.setVisible(False)
-        self._goal_pose_item = CarItem(self._measured_state, color="g")
+        self._goal_pose_item = CarItem(None, color="g")
         self._goal_pose_item.setVisible(False)
         self._goal_unreachable_item = pg.TextItem("Goal is unreachable", color="r")
         font = QFont()
@@ -137,8 +134,8 @@ class MainWindow(QMainWindow):
         self._steer_plot_widget.addItem(self._steer_plot_item)
 
         # declare nodes
+        self._map_server_node = MapServerNode()
         self._car_simulation_node = CarSimulationNode(
-            initial_state=self._measured_state.copy(),
             delta_time_s=SIMULATION_DELTA_TIME,
             simulation_interval_s=SIMULATION_INTERVAL,
             simulation_publish_interval_s=SIMULATION_PUBLISH_INTERVAL,
@@ -164,6 +161,8 @@ class MainWindow(QMainWindow):
         self._local_planner_node.control_sequence.connect(self._car_simulation_node.set_control_sequence)
         self._local_planner_node.local_trajectory.connect(self._update_local_trajectory)
         self._local_planner_node.reference_points.connect(self._update_reference_points)
+        self._map_server_node.inited.connect(self._car_simulation_node.set_state)
+        self._map_server_node.inited.connect(self._inited)
         self._map_server_node.known_obstacle_coordinates_updated.connect(self._update_known_obstacle_coordinates)
         self._map_server_node.new_obstacle_coordinates.connect(self._trajectory_collision_checking_node.check_collision)
         self._trajectory_collision_checking_node.collided.connect(self._local_planner_node.brake)
@@ -171,21 +170,31 @@ class MainWindow(QMainWindow):
         self.canceled.connect(self._car_simulation_node.stop)
         self.canceled.connect(self._global_planner_node.cancel)
         self.canceled.connect(self._local_planner_node.cancel)
+        self.canceled.connect(self._trajectory_collision_checking_node.cancel)
         self.set_goal.connect(self._global_planner_node.plan)
         self.set_state.connect(self._car_simulation_node.set_state)
 
         self._ui.cancel_button.clicked.connect(self.cancel)
+        self._ui.restart_button.clicked.connect(self.restart)
         self._ui.set_pose_button.clicked.connect(lambda: self._pressed_pose_item.set_color("w"))
         self._ui.set_goal_button.clicked.connect(lambda: self._pressed_pose_item.set_color("g"))
         self._plot_viewbox.sigMouseDrag.connect(self._mouse_drag)
 
         # start tasks
+        self._map_server_node.init()
         self._car_simulation_node.start()
         self._global_planner_node.start()
         self._local_planner_node.start()
 
     @Slot()
-    def cancel(self):
+    def restart(self) -> None:
+        self.cancel()
+        self._trajectory_item.setVisible(False)
+        self._goal_pose_item.setVisible(False)
+        QTimer.singleShot(0, self._map_server_node.init)
+
+    @Slot()
+    def cancel(self) -> None:
         self._car_simulation_stopped = True
         self._replan_needed = False
         self.canceled.emit()
@@ -225,6 +234,10 @@ class MainWindow(QMainWindow):
             self._goal_pose_item.set_state(state)
             self._goal_pose_item.setVisible(True)
             self._goal_unreachable_item.setPos(start_x, start_y)
+
+    def _inited(self, _: Car) -> None:
+        self._known_obstacles_item.setData(*self._map_server_node.known_obstacle_coordinates.T)
+        self._unknown_obstacles_item.setData(*self._map_server_node.unknown_obstacle_coordinates.T)
 
     @Slot()
     def _trajectory_collided(self) -> None:
