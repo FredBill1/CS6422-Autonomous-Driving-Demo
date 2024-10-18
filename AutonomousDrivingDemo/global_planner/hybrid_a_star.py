@@ -19,6 +19,8 @@ MOTION_RESOLUTION = 0.5  # [m] path interpolate resolution
 MOTION_DISTANCE = XY_GRID_RESOLUTION * 1.5  # [m] path interpolate distance
 NUM_STEER_COMMANDS = 10  # number of steer command
 
+REEDS_SHEPP_MAX_DISTANCE = 10.0  # maximum distance to use Reeds-Shepp path
+
 SWITCH_DIRECTION_COST = 25.0  # switch direction cost
 BACKWARDS_COST = 4.0  # backward movement cost
 STEER_CHANGE_COST = 3.0  # steer angle change cost
@@ -254,10 +256,11 @@ def hybrid_a_star(
         if cancel_callback is not None and cancel_callback(cur):
             return None  # canceled
 
-        if (rsnode := generate_rspath(cur)) is not None:
-            if RETURN_RS_PATH_IMMEDIATELY:
-                return traceback_path(rsnode)
-            heapq.heappush(pq, rsnode)
+        if np.linalg.norm(cur.path.trajectory[-1, :2] - goal[:2]) <= REEDS_SHEPP_MAX_DISTANCE:
+            if (rsnode := generate_rspath(cur)) is not None:
+                if RETURN_RS_PATH_IMMEDIATELY:
+                    return traceback_path(rsnode)
+                heapq.heappush(pq, rsnode)
 
         for neighbour in generate_neighbours(cur):
             if dp[neighbour.path.ijk] is None or neighbour.cost < dp[neighbour.path.ijk].cost:
