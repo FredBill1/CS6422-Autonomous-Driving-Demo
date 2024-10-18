@@ -42,7 +42,7 @@ class Car:
 
     TARGET_MIN_TURNING_RADIUS = WHEEL_BASE / np.tan(TARGET_MAX_STEER)  # [m], for global planner
 
-    SCAN_RADIUS = 10.0  # [m]
+    SCAN_RADIUS = 15.0  # [m]
     SCAN_SIGMA = 0.25  # [m]
 
     CONTROL_SIGMA = np.array([5.0 / 3.6, np.deg2rad(5.0)]) / MAX_SPEED  # [m/s, rad], [velocity, steer]
@@ -85,16 +85,20 @@ class Car:
     def copy(self) -> "Car":
         return replace(self)
 
-    def check_collision(self, obstacles: Obstacles) -> bool:
+    def check_collision(self, obstacles: Obstacles | np.ndarray) -> bool:
         "Check if the car collides with any obstacles in the given `Obstacles` instance."
 
         # calculate the center of the car, since (self.x, self.y) represents the coordinate of the middle of the rear wheels
         c, s = np.cos(self.yaw), np.sin(self.yaw)
         center_x, center_y = self.x + self.BACK_TO_CENTER * c, self.y + self.BACK_TO_CENTER * s
 
-        # query the obstacles within the collision radius
-        ids = obstacles.kd_tree.query_ball_point([center_x, center_y], self.COLLISION_RADIUS)
-        candidates = obstacles.coordinates[ids]
+        if isinstance(obstacles, Obstacles):
+            # query the obstacles within the collision radius
+            ids = obstacles.kd_tree.query_ball_point([center_x, center_y], self.COLLISION_RADIUS)
+            candidates = obstacles.coordinates[ids]
+        else:
+            # the input is already the coordinates of the obstacles
+            candidates = obstacles
 
         # translate and then rotate the coordinates of the obstacles to the car's local frame, to facilitate checking
         candidates = (candidates - [center_x, center_y]) @ np.array([[c, -s], [s, c]])

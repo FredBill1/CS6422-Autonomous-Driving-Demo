@@ -1,4 +1,4 @@
-from typing import override
+from typing import Optional, override
 
 import numpy as np
 import pyqtgraph as pg
@@ -7,16 +7,22 @@ from ..modeling.Car import Car
 
 
 class CarItem(pg.GraphicsObject):
-    def __init__(self, car: Car, color=None):
+    LIDAR_BOUNDING_RECT = pg.QtCore.QRectF(-Car.SCAN_RADIUS, -Car.SCAN_RADIUS, 2 * Car.SCAN_RADIUS, 2 * Car.SCAN_RADIUS)
+
+    def __init__(self, car: Optional[Car], *, color=None, with_lidar: bool = False) -> None:
         super().__init__()
         if color is None:
             color = pg.mkQApp().palette().color(pg.QtGui.QPalette.ColorRole.WindowText)
         self._color = color
+        self._with_lidar = with_lidar
         self.set_state(car)
 
-    def set_state(self, car: Car) -> None:
-        self.prepareGeometryChange()
+    def set_state(self, car: Optional[Car]) -> None:
         self._car = car
+        if car is None:
+            return
+
+        self.prepareGeometryChange()
 
         # Outline and wheels geometry
         BOX = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1], [-1, -1]]) / 2
@@ -39,8 +45,11 @@ class CarItem(pg.GraphicsObject):
         for i, x in enumerate(self._items):
             self._items[i] = (rot1 @ x.T).T + [car.x, car.y]
         points = np.concatenate(self._items)
-        minx, miny, maxx, maxy = points[:, 0].min(), points[:, 1].min(), points[:, 0].max(), points[:, 1].max()
-        self._bounding_rect = pg.QtCore.QRectF(minx, miny, maxx - minx, maxy - miny)
+        if self._with_lidar:
+            self._bounding_rect = self.LIDAR_BOUNDING_RECT.translated(car.x, car.y)
+        else:
+            minx, miny, maxx, maxy = points[:, 0].min(), points[:, 1].min(), points[:, 0].max(), points[:, 1].max()
+            self._bounding_rect = pg.QtCore.QRectF(minx, miny, maxx - minx, maxy - miny)
         self.update()
 
     def set_color(self, color: str) -> None:
@@ -49,11 +58,15 @@ class CarItem(pg.GraphicsObject):
 
     @override
     def paint(self, p: pg.QtGui.QPainter, *args) -> None:
+        if self._car is None:
+            return
         p.setPen(pg.mkPen(self._color))
         for item in self._items:
             p.drawPolyline(pg.QtGui.QPolygonF([pg.QtCore.QPointF(x, y) for x, y in item]))
         p.drawEllipse(pg.QtCore.QPointF(self._car.x, self._car.y), 0.1, 0.1)
+        if self._with_lidar:
+            p.drawEllipse(pg.QtCore.QPointF(self._car.x, self._car.y), Car.SCAN_RADIUS, Car.SCAN_RADIUS)
 
     @override
     def boundingRect(self) -> pg.QtCore.QRectF:
-        return self._bounding_rect
+        return self._bounding_rect if self._car is not None else pg.QtCore.QRectF()

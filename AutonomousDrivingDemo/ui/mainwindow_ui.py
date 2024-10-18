@@ -57,6 +57,11 @@ class Ui_MainWindow(object):
 
         self.control_layout.addWidget(self.cancel_button)
 
+        self.restart_button = QPushButton(self.central_widget)
+        self.restart_button.setObjectName(u"restart_button")
+
+        self.control_layout.addWidget(self.restart_button)
+
         self.horizontal_spacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.control_layout.addItem(self.horizontal_spacer)
@@ -74,17 +79,21 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Autonomous Driving Demo", None))
-        self.set_goal_button.setText(QCoreApplication.translate("MainWindow", u"Set Goal(A)", None))
+        self.set_goal_button.setText(QCoreApplication.translate("MainWindow", u"Set Goal(Z)", None))
 #if QT_CONFIG(shortcut)
-        self.set_goal_button.setShortcut(QCoreApplication.translate("MainWindow", u"A", None))
+        self.set_goal_button.setShortcut(QCoreApplication.translate("MainWindow", u"Z", None))
 #endif // QT_CONFIG(shortcut)
-        self.set_pose_button.setText(QCoreApplication.translate("MainWindow", u"Set Pose(S)", None))
+        self.set_pose_button.setText(QCoreApplication.translate("MainWindow", u"Set Pose(X)", None))
 #if QT_CONFIG(shortcut)
-        self.set_pose_button.setShortcut(QCoreApplication.translate("MainWindow", u"S", None))
+        self.set_pose_button.setShortcut(QCoreApplication.translate("MainWindow", u"X", None))
 #endif // QT_CONFIG(shortcut)
-        self.cancel_button.setText(QCoreApplication.translate("MainWindow", u"Cancel(F)", None))
+        self.cancel_button.setText(QCoreApplication.translate("MainWindow", u"Cancel(C)", None))
 #if QT_CONFIG(shortcut)
-        self.cancel_button.setShortcut(QCoreApplication.translate("MainWindow", u"F", None))
+        self.cancel_button.setShortcut(QCoreApplication.translate("MainWindow", u"C", None))
+#endif // QT_CONFIG(shortcut)
+        self.restart_button.setText(QCoreApplication.translate("MainWindow", u"Restart(R)", None))
+#if QT_CONFIG(shortcut)
+        self.restart_button.setShortcut(QCoreApplication.translate("MainWindow", u"R", None))
 #endif // QT_CONFIG(shortcut)
     # retranslateUi
 

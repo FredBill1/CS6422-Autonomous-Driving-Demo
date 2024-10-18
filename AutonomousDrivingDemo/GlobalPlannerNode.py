@@ -17,7 +17,7 @@ def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
     # use multiprocessing to bypass the GIL to prevent GUI freezes
     while True:
         data: Optional[tuple[Car, Car, Obstacles]] = pipe.recv()
-        if data is None:
+        if data is None or pipe.poll():
             continue
         display_segments: list[npt.NDArray[np.floating[Any]]] = []
         canceled = False
@@ -35,7 +35,7 @@ def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
             return False
 
         trajectory = hybrid_a_star(*data, callback)
-        if not canceled:
+        if not (canceled or pipe.poll()):
             pipe.send(trajectory)
 
 
