@@ -61,9 +61,12 @@ class LocalPlannerNode(QObject):
         self._state = (timestamp_s, state)
 
     @Slot(np.ndarray)
-    def set_trajectory(self, trajectory: npt.NDArray[np.floating[Any]]) -> None:
-        self._parent_pipe.send(trajectory)
-        self._brake = False
+    def set_trajectory(self, trajectory: Optional[npt.NDArray[np.floating[Any]]]) -> None:
+        if trajectory is not None:
+            self._parent_pipe.send(trajectory)
+            self._brake = False
+        else:
+            self._brake = True
 
     @Slot()
     def brake(self) -> None:

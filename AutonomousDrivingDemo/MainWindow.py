@@ -36,8 +36,6 @@ LOCAL_PLANNER_UPDATE_INTERVAL = 0.2
 
 DASHBOARD_HISTORY_SIZE = 250
 
-REPLAN_MAX_VELOCITY = 5 / 3.6  # m/s
-
 
 class _CustomViewBox(pg.ViewBox):
     sigMouseDrag = Signal(MouseDragEvent)
@@ -66,7 +64,6 @@ class MainWindow(QMainWindow):
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_timestamps: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._car_simulation_stopped = True
-        self._replan_needed = False
 
         # setup ui
         self._ui = Ui_MainWindow()
@@ -196,7 +193,6 @@ class MainWindow(QMainWindow):
     @Slot()
     def cancel(self) -> None:
         self._car_simulation_stopped = True
-        self._replan_needed = False
         self.canceled.emit()
         self._clear_global_planner_display_segments()
         self._local_trajectory_item.setData([], [])
@@ -241,7 +237,10 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _trajectory_collided(self) -> None:
-        self._replan_needed = True
+        self._trajectory_item.setVisible(False)
+        self.set_goal.emit(
+            self._measured_state, self._goal_state, Obstacles(self._map_server_node.known_obstacle_coordinates)
+        )
 
     @Slot(list)
     def _update_global_planner_display_segments(self, display_segments: list[npt.NDArray[np.floating[Any]]]) -> None:
@@ -295,11 +294,6 @@ class MainWindow(QMainWindow):
         self._plot_widget.setTitle(f"Timestamp: {timestamp_s:.1f}s")
         self._velocity_plot_widget.setTitle(f"Velocity: {state.velocity * 3.6:.1f}km/h")
         self._steer_plot_widget.setTitle(f"Steer: {np.rad2deg(state.steer):.1f}°")
-
-        if self._replan_needed and abs(state.velocity) < REPLAN_MAX_VELOCITY:
-            self._replan_needed = False
-            self._trajectory_item.setVisible(False)
-            self.set_goal.emit(state, self._goal_state, Obstacles(self._map_server_node.known_obstacle_coordinates))
 
     @Slot(np.ndarray)
     def _update_local_trajectory(self, local_trajectory: npt.NDArray[np.floating[Any]]) -> None:
