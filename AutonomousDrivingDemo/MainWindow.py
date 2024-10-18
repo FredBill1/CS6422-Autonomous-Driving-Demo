@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
         self._obstacle_item = pg.ScatterPlotItem(
             *self._obstacles.coordinates.T, size=5, symbol="o", pen=None, brush=(255, 0, 0)
         )
-        self._measured_state_item = CarItem(self._measured_state, color="w")
+        self._measured_state_item = CarItem(self._measured_state, color="w", with_lidar=True)
         self._pressed_pose_item = CarItem(self._measured_state, color="g")
         self._pressed_pose_item.setVisible(False)
         self._goal_pose_item = CarItem(self._measured_state, color="g")

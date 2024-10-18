@@ -42,7 +42,7 @@ class Car:
 
     TARGET_MIN_TURNING_RADIUS = WHEEL_BASE / np.tan(TARGET_MAX_STEER)  # [m], for global planner
 
-    SCAN_RADIUS = 10.0  # [m]
+    SCAN_RADIUS = 15.0  # [m]
     SCAN_SIGMA = 0.25  # [m]
 
     CONTROL_SIGMA = np.array([5.0 / 3.6, np.deg2rad(5.0)]) / MAX_SPEED  # [m/s, rad], [velocity, steer]
