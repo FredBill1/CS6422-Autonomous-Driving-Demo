@@ -63,6 +63,7 @@ class MainWindow(QMainWindow):
         self._measured_velocities: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_timestamps: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
+        self._local_trajectory: Optional[npt.NDArray[np.floating[Any]]] = None
         self._car_simulation_stopped = True
 
         # setup ui
@@ -238,9 +239,11 @@ class MainWindow(QMainWindow):
     @Slot()
     def _trajectory_collided(self) -> None:
         self._trajectory_item.setVisible(False)
-        self.set_goal.emit(
-            self._measured_state, self._goal_state, Obstacles(self._map_server_node.known_obstacle_coordinates)
-        )
+        if self._local_trajectory is not None:
+            state = Car(*self._local_trajectory[len(self._local_trajectory) // 2, :3])
+        else:
+            state = self._measured_state
+        self.set_goal.emit(state, self._goal_state, Obstacles(self._map_server_node.known_obstacle_coordinates))
 
     @Slot(list)
     def _update_global_planner_display_segments(self, display_segments: list[npt.NDArray[np.floating[Any]]]) -> None:
@@ -299,7 +302,8 @@ class MainWindow(QMainWindow):
     def _update_local_trajectory(self, local_trajectory: npt.NDArray[np.floating[Any]]) -> None:
         if self._car_simulation_stopped:
             return
-        self._local_trajectory_item.setData(*local_trajectory.T)
+        self._local_trajectory = local_trajectory
+        self._local_trajectory_item.setData(*local_trajectory.T[:2])
 
     @Slot(np.ndarray)
     def _update_reference_points(self, reference_points: npt.NDArray[np.floating[Any]]) -> None:

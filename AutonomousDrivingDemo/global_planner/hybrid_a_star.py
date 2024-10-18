@@ -123,7 +123,6 @@ def hybrid_a_star(
 
     def generate_neighbour(cur: Node, direction: int, steer: float) -> Optional[Node]:
         "Generate a neighbour node of the current node, given the direction and steer angle"
-        print(start_collided)
 
         # Simulate the car movement for MOTION_DISTANCE, with a interval of MOTION_RESOLUTION,
         # check if the car will collide with the obstacles during the movement
