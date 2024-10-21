@@ -15,7 +15,12 @@ class TrajectoryCollisionChecker:
     def __init__(self, trajectory: npt.NDArray[np.floating[Any]]) -> None:
         assert trajectory.ndim == 2 and trajectory.shape[1] == 3, "trajectory must be 2D array having [[x, y, yaw]]"
         self._trajectory = trajectory
-        self._trajectory_kd_tree = KDTree(trajectory[:, :2])
+
+        # Calculate the trajectory of the center of the car, instead of the center of the rear axle
+        xy, yaw = trajectory[:, :2], trajectory[:, 2]
+        cy, sy = np.cos(yaw), np.sin(yaw)
+        xy = (xy.T + [Car.BACK_TO_CENTER * cy, Car.BACK_TO_CENTER * sy]).T
+        self._trajectory_kd_tree = KDTree(xy)
 
     def check(self, obstacles: Obstacles) -> bool:
         indices = self._trajectory_kd_tree.query_ball_tree(obstacles.kd_tree, Car.COLLISION_RADIUS)
