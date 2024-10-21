@@ -1,4 +1,5 @@
 import multiprocessing as mp
+from enum import Enum, auto
 from multiprocessing.connection import Connection
 from typing import Any, Optional
 
@@ -12,20 +13,25 @@ from .utils.PipeRecvWorker import PipeRecvWorker
 from .utils.set_high_priority import set_high_priority
 
 
+class _ParentMsgType(Enum):
+    TRAJECTORY = auto()
+    STATE = auto()
+    CANCEL = auto()
+
+
 def _worker_process(pipe: Connection, delta_time_s: float) -> None:
     # use multiprocessing to bypass the GIL to prevent GUI freezes
     mpc: Optional[ModelPredictiveControl] = None
     while True:
-        data = pipe.recv()
-        if data is None:
-            mpc = None
-        elif isinstance(data, np.ndarray):
-            mpc = ModelPredictiveControl(data)
-        else:
-            if pipe.poll():  # discard outdated data
-                continue
-            timestamp_s, state = data
-            pipe.send(None if mpc is None else (timestamp_s, state, mpc.update(state, delta_time_s)))
+        match pipe.recv():
+            case _ParentMsgType.CANCEL, None:
+                mpc = None
+            case _ParentMsgType.TRAJECTORY, trajectory:
+                mpc = ModelPredictiveControl(trajectory)
+            case _ParentMsgType.STATE, (timestamp_s, state):
+                if pipe.poll() or mpc is None:  # discard outdated data
+                    continue
+                pipe.send((timestamp_s, state, mpc.update(state, delta_time_s)))
 
 
 class LocalPlannerNode(QObject):
@@ -63,7 +69,7 @@ class LocalPlannerNode(QObject):
     @Slot(np.ndarray)
     def set_trajectory(self, trajectory: Optional[npt.NDArray[np.floating[Any]]]) -> None:
         if trajectory is not None:
-            self._parent_pipe.send(trajectory)
+            self._parent_pipe.send((_ParentMsgType.TRAJECTORY, trajectory))
             self._brake = False
         else:
             self._brake = True
@@ -74,17 +80,15 @@ class LocalPlannerNode(QObject):
 
     @Slot()
     def cancel(self) -> None:
-        self._parent_pipe.send(None)
+        self._parent_pipe.send((_ParentMsgType.CANCEL, None))
 
     @Slot()
     def _update(self) -> None:
         if self._state is not None:
-            self._parent_pipe.send(self._state)
+            self._parent_pipe.send((_ParentMsgType.STATE, self._state))
 
     @Slot(tuple)
-    def _worker_recv(self, data: Optional[tuple[float, Car, MPCResult]]) -> None:
-        if data is None:
-            return
+    def _worker_recv(self, data: tuple[float, Car, MPCResult]) -> None:
         timestamp_s, state, result = data
         timestamps = np.arange(len(result.controls)) * self._delta_time_s + timestamp_s
         if not self._brake:
