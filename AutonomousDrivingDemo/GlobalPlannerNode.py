@@ -1,4 +1,5 @@
 import multiprocessing as mp
+from enum import Enum, auto
 from multiprocessing.connection import Connection
 from typing import Any, Optional
 
@@ -13,30 +14,41 @@ from .utils.PipeRecvWorker import PipeRecvWorker
 from .utils.set_high_priority import set_high_priority
 
 
+class _ParentMsgType(Enum):
+    PLAN = auto()
+    CANCEL = auto()
+
+
+class _WorkerMsgType(Enum):
+    DISPLAY_SEGMENTS = auto()
+    TRAJECTORY = auto()
+
+
 def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
     # use multiprocessing to bypass the GIL to prevent GUI freezes
     while True:
-        data: Optional[tuple[Car, Car, Obstacles]] = pipe.recv()
-        if data is None or pipe.poll():
-            continue
-        display_segments: list[npt.NDArray[np.floating[Any]]] = []
-        canceled = False
+        match pipe.recv():
+            case _ParentMsgType.CANCEL:
+                continue
+            case _ParentMsgType.PLAN, start, goal, obstacles:
+                if pipe.poll():  # discard outdated data
+                    continue
 
-        def callback(node: Node) -> bool:
-            display_segments.append(node.get_plot_trajectory())
-            if len(display_segments) < segment_collection_size:
-                return
-            if pipe.poll():
-                nonlocal canceled
-                canceled = True
-                return True
-            pipe.send(display_segments)
-            display_segments.clear()
-            return False
+                display_segments: list[npt.NDArray[np.floating[Any]]] = []
 
-        trajectory = hybrid_a_star(*data, callback)
-        if not (canceled or pipe.poll()):
-            pipe.send(trajectory)
+                def callback(node: Node) -> bool:
+                    display_segments.append(node.get_plot_trajectory())
+                    if len(display_segments) < segment_collection_size:
+                        return
+                    if pipe.poll():
+                        return True
+                    pipe.send((_WorkerMsgType.DISPLAY_SEGMENTS, display_segments))
+                    display_segments.clear()
+                    return False
+
+                trajectory = hybrid_a_star(start, goal, obstacles, callback)
+                if not pipe.poll():
+                    pipe.send((_WorkerMsgType.TRAJECTORY, trajectory))
 
 
 class GlobalPlannerNode(QObject):
@@ -61,17 +73,18 @@ class GlobalPlannerNode(QObject):
     def plan(self, start_state: Car, goal_state: Car, obstacles: Obstacles) -> None:
         start = np.array([start_state.x, start_state.y, start_state.yaw])
         goal = np.array([goal_state.x, goal_state.y, goal_state.yaw])
-        self._parent_pipe.send((start, goal, obstacles))
+        self._parent_pipe.send((_ParentMsgType.PLAN, start, goal, obstacles))
 
     @Slot()
     def cancel(self) -> None:
-        self._parent_pipe.send(None)
+        self._parent_pipe.send(_ParentMsgType.CANCEL)
 
     @Slot(object)
-    def _worker_recv(self, data: list[npt.NDArray[np.floating[Any]]] | Optional[npt.NDArray[np.floating[Any]]]) -> None:
-        if isinstance(data, list):
-            self.display_segments.emit(data)
-        else:
-            self.trajectory.emit(data)
-            if data is not None:
-                self.finished.emit()
+    def _worker_recv(self, data) -> None:
+        match data:
+            case _WorkerMsgType.DISPLAY_SEGMENTS, display_segments:
+                self.display_segments.emit(display_segments)
+            case _WorkerMsgType.TRAJECTORY, trajectory:
+                self.trajectory.emit(trajectory)
+                if trajectory is not None:
+                    self.finished.emit()

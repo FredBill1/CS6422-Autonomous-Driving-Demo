@@ -24,7 +24,7 @@ def _worker_process(pipe: Connection, delta_time_s: float) -> None:
     mpc: Optional[ModelPredictiveControl] = None
     while True:
         match pipe.recv():
-            case _ParentMsgType.CANCEL, None:
+            case _ParentMsgType.CANCEL:
                 mpc = None
             case _ParentMsgType.TRAJECTORY, trajectory:
                 mpc = ModelPredictiveControl(trajectory)
@@ -80,7 +80,7 @@ class LocalPlannerNode(QObject):
 
     @Slot()
     def cancel(self) -> None:
-        self._parent_pipe.send((_ParentMsgType.CANCEL, None))
+        self._parent_pipe.send(_ParentMsgType.CANCEL)
 
     @Slot()
     def _update(self) -> None:
