@@ -16,6 +16,7 @@ from .utils.set_high_priority import set_high_priority
 class _ParentMsgType(Enum):
     TRAJECTORY = auto()
     STATE = auto()
+    BRAKE = auto()
     CANCEL = auto()
 
 
@@ -28,6 +29,9 @@ def _worker_process(pipe: Connection, delta_time_s: float) -> None:
                 mpc = None
             case _ParentMsgType.TRAJECTORY, trajectory:
                 mpc = ModelPredictiveControl(trajectory)
+            case _ParentMsgType.BRAKE:
+                if mpc is not None:
+                    mpc.brake()
             case _ParentMsgType.STATE, (timestamp_s, state):
                 if pipe.poll() or mpc is None:  # discard outdated data
                     continue
@@ -53,8 +57,6 @@ class LocalPlannerNode(QObject):
         self._update_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._update_timer.setInterval(int(update_interval_s * 1000))
 
-        self._brake = False
-
     @Slot()
     def start(self) -> None:
         self._worker.start()
@@ -70,13 +72,12 @@ class LocalPlannerNode(QObject):
     def set_trajectory(self, trajectory: Optional[npt.NDArray[np.floating[Any]]]) -> None:
         if trajectory is not None:
             self._parent_pipe.send((_ParentMsgType.TRAJECTORY, trajectory))
-            self._brake = False
         else:
-            self._brake = True
+            self._parent_pipe.send(_ParentMsgType.BRAKE)
 
     @Slot()
     def brake(self) -> None:
-        self._brake = True
+        self._parent_pipe.send(_ParentMsgType.BRAKE)
 
     @Slot()
     def cancel(self) -> None:
@@ -91,10 +92,7 @@ class LocalPlannerNode(QObject):
     def _worker_recv(self, data: tuple[float, Car, MPCResult]) -> None:
         timestamp_s, state, result = data
         timestamps = np.arange(len(result.controls)) * self._delta_time_s + timestamp_s
-        if not self._brake:
-            velocities = state.velocity + np.cumsum(result.controls[:, 0] * self._delta_time_s)
-        else:
-            velocities = np.zeros_like(result.controls[:, 0])
+        velocities = state.velocity + np.cumsum(result.controls[:, 0] * self._delta_time_s)
         steers = result.controls[:, 1]
         control_sequence = np.column_stack((timestamps, velocities, steers))
         self.control_sequence.emit(control_sequence)
