@@ -96,5 +96,5 @@ class LocalPlannerNode(QObject):
         steers = result.controls[:, 1]
         control_sequence = np.column_stack((timestamps, velocities, steers))
         self.control_sequence.emit(control_sequence)
-        self.local_trajectory.emit(result.states[:, :3])
-        self.reference_points.emit(result.ref_states[:, :2])
+        self.local_trajectory.emit(result.states[:, :2])
+        self.reference_points.emit(result.ref_states)

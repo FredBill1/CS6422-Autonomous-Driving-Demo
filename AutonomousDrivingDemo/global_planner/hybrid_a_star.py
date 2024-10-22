@@ -94,12 +94,16 @@ def hybrid_a_star(
     obstacles: Obstacles,
     cancel_callback: Optional[Callable[[Node], SupportsBool]] = None,
 ) -> Optional[npt.NDArray[np.floating[Any]]]:
-    assert start.shape == (3,) and goal.shape == (3,), "Start and goal must be a 1D array of shape (3)"
+    assert start.shape == (3,) or (
+        len(start.shape) == 2 and start.shape[1] == 4
+    ), "Start must be a 1D array of shape (3) representing [x, y, yaw] or a 2D array of shape (N, 4) representing [x, y, yaw, velocity]"
+    assert goal.shape == (3,), "Goal must be a 1D array of shape (3) representing [x, y, yaw]"
 
     if Car(*goal).check_collision(obstacles):
         return None
 
-    start_collided = Car(*start).check_collision(obstacles)
+    start_is_point = start.shape == (3,)
+    start_collided = Car(*start).check_collision(obstacles) if start_is_point else False
 
     # Downsample the obstacle map to a grid
     obstacle_grid = obstacles.downsampling_to_grid(
@@ -126,7 +130,7 @@ def hybrid_a_star(
 
         # Simulate the car movement for MOTION_DISTANCE, with a interval of MOTION_RESOLUTION,
         # check if the car will collide with the obstacles during the movement
-        car = Car(*cur.path.trajectory[-1], velocity=float(direction), steer=steer)
+        car = Car(*cur.path.trajectory[-1, :3], velocity=float(direction), steer=steer)
         trajectory = []
         for _ in range(int(MOTION_DISTANCE / MOTION_RESOLUTION)):
             car.update(MOTION_RESOLUTION)
@@ -184,7 +188,7 @@ def hybrid_a_star(
             2. the cost of the path is calculated as the sum of the cost of each segment in the path.
             """
             last_direction = node.path.direction
-            last_steer = node.path.trajectory[-1, 2]
+            last_steer = node.path.steer
 
             distance_cost = 0.0
             switch_direction_cost = 0.0
@@ -204,7 +208,7 @@ def hybrid_a_star(
 
         # generate all possible Reeds-Shepp pathes
         pathes = solve_rspath(
-            tuple(node.path.trajectory[-1]), tuple(goal), Car.TARGET_MIN_TURNING_RADIUS, MOTION_RESOLUTION
+            tuple(node.path.trajectory[-1, :3]), tuple(goal), Car.TARGET_MIN_TURNING_RADIUS, MOTION_RESOLUTION
         )
 
         # filter out the pathes that collide with the obstacles
@@ -229,7 +233,10 @@ def hybrid_a_star(
         while node is not None:
             path = node.path
             if isinstance(path, SimplePath):
-                segments.append(np.hstack((path.trajectory, np.full_like(path.trajectory[:, :1], path.direction))))
+                if path.trajectory.shape[1] == 4:
+                    segments.append(path.trajectory)
+                else:
+                    segments.append(np.hstack((path.trajectory, np.full_like(path.trajectory[:, :1], path.direction))))
             else:
                 # RSPath contains the start point, so we skip it using islice
                 segments.append([[p.x, p.y, p.yaw, p.driving_direction] for p in islice(path.waypoints(), 1, None)])
@@ -241,10 +248,14 @@ def hybrid_a_star(
         return trajectory
 
     # A* search (Similar to Dijkstra's algorithm, but with a heuristic cost added)
-    start_ijk = calc_ijk(*start)
-    start_node = Node(
-        SimplePath(start_ijk, np.array([start]), 0, 0.0), 0.0, H_DIST_COST * heuristic_grid.grid[start_ijk[:2]], None
-    )
+    if start_is_point:
+        start_ijk = calc_ijk(*start)
+        path = SimplePath(start_ijk, np.array([start]), 0, 0.0)
+    else:
+        start_ijk = calc_ijk(*start[-1, :3])
+        start[:, 3] = np.sign(start[:, 3])
+        path = SimplePath(start_ijk, start, start[-1, 3], 0.0)
+    start_node = Node(path, 0.0, H_DIST_COST * heuristic_grid.grid[start_ijk[:2]], None)
     dp[start_ijk] = start_node
     pq = [start_node]
     while pq:

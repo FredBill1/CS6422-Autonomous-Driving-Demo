@@ -143,7 +143,7 @@ class ModelPredictiveControl:
         assert ref_trajectory.shape[1] == 4, "Reference trajectory have [[x, y, yaw, direction], ...]"
         ref_trajectory[:, 2] = smooth_yaw(ref_trajectory[:, 2])
         v = ref_trajectory[:, 3]
-        v[:-1][v[1:] != v[:-1]] = 0.0  # make the vehicle stop at the direction changing point
+        v[:-1][v[1:] * v[:-1] < 0] = 0.0  # make the vehicle stop at the direction changing point
 
         # remove the consecutive direction changing points
         mask = v == 0

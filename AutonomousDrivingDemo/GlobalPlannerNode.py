@@ -69,9 +69,12 @@ class GlobalPlannerNode(QObject):
         set_high_priority(self._worker.pid)
         self._recv_worker.start(QThread.Priority.HighestPriority)
 
-    @Slot(Car, Car, Obstacles)
-    def plan(self, start_state: Car, goal_state: Car, obstacles: Obstacles) -> None:
-        start = np.array([start_state.x, start_state.y, start_state.yaw])
+    @Slot(object, Car, Obstacles)
+    def plan(self, start_state: Car | npt.NDArray[np.floating[Any]], goal_state: Car, obstacles: Obstacles) -> None:
+        if isinstance(start_state, Car):
+            start = np.array([start_state.x, start_state.y, start_state.yaw])
+        else:
+            start = start_state
         goal = np.array([goal_state.x, goal_state.y, goal_state.yaw])
         self._parent_pipe.send((_ParentMsgType.PLAN, start, goal, obstacles))
 
