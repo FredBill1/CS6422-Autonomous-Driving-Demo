@@ -254,7 +254,12 @@ def hybrid_a_star(
     else:
         start_ijk = calc_ijk(*start[-1, :3])
         start[:, 3] = np.sign(start[:, 3])
-        path = SimplePath(start_ijk, start, start[-1, 3], 0.0)
+        steer = 0.0
+        if start.shape[0] >= 2:
+            l = np.linalg.norm(start[-1, :2] - start[-2, :2])
+            steer = np.arctan(Car.WHEEL_BASE * (start[-1, 2] - start[-2, 2]) / l)
+
+        path = SimplePath(start_ijk, start, start[-1, 3], steer)
     start_node = Node(path, 0.0, H_DIST_COST * heuristic_grid.grid[start_ijk[:2]], None)
     dp[start_ijk] = start_node
     pq = [start_node]
