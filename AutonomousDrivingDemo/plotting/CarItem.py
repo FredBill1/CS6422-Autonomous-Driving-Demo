@@ -46,7 +46,8 @@ class CarItem(pg.GraphicsObject):
             self._items[i] = (rot1 @ x.T).T + [car.x, car.y]
         points = np.concatenate(self._items)
         if self._with_lidar:
-            self._bounding_rect = self.LIDAR_BOUNDING_RECT.translated(car.x, car.y)
+            x, y = car.x + cy * Car.BACK_TO_CENTER, car.y + sy * Car.BACK_TO_CENTER
+            self._bounding_rect = self.LIDAR_BOUNDING_RECT.translated(x, y)
         else:
             minx, miny, maxx, maxy = points[:, 0].min(), points[:, 1].min(), points[:, 0].max(), points[:, 1].max()
             self._bounding_rect = pg.QtCore.QRectF(minx, miny, maxx - minx, maxy - miny)
@@ -65,7 +66,9 @@ class CarItem(pg.GraphicsObject):
             p.drawPolyline(pg.QtGui.QPolygonF([pg.QtCore.QPointF(x, y) for x, y in item]))
         p.drawEllipse(pg.QtCore.QPointF(self._car.x, self._car.y), 0.1, 0.1)
         if self._with_lidar:
-            p.drawEllipse(pg.QtCore.QPointF(self._car.x, self._car.y), Car.SCAN_RADIUS, Car.SCAN_RADIUS)
+            cy, sy = np.cos(self._car.yaw), np.sin(self._car.yaw)
+            x, y = self._car.x + cy * Car.BACK_TO_CENTER, self._car.y + sy * Car.BACK_TO_CENTER
+            p.drawEllipse(pg.QtCore.QPointF(x, y), Car.SCAN_RADIUS, Car.SCAN_RADIUS)
 
     @override
     def boundingRect(self) -> pg.QtCore.QRectF:

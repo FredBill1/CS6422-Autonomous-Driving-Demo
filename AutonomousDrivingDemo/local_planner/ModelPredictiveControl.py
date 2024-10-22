@@ -7,13 +7,13 @@ import scipy.interpolate
 import scipy.optimize
 
 from ..modeling.Car import Car
-from ..utils.wrap_angle import smooth_yaw, wrap_angle
+from ..utils.wrap_angle import smooth_yaw
 
 NEARIST_POINT_SEARCH_RANGE = 8.0  # [m]
 NEARIST_POINT_SEARCH_STEP = 0.1  # [m]
 
 HORIZON_LENGTH = 5  # simulate count
-MIN_HORIZON_DISTANCE = 2.0  # [m]
+MIN_HORIZON_DISTANCE = 1.0  # [m]
 
 MAX_ITER = 5
 DU_TH = 0.1  # iteration finish param
@@ -151,7 +151,6 @@ class ModelPredictiveControl:
         mask[0] = mask[-1] = True
 
         v *= Car.TARGET_SPEED  # make the target velocity at each point of the trajectory to be TARGET_SPEED
-        v[-1] = 0.0  # make the vehicle stop at the goal
         self._goal = ref_trajectory[-1]
 
         # [x, y, yaw, v] -> [x, y, v, yaw]

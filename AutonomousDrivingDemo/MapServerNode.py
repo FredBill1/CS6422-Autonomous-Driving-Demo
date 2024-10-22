@@ -80,4 +80,5 @@ class MapServerNode(QObject):
 
     @Slot(float, Car)
     def update(self, timestamp_s: float, state: Car) -> None:
-        self._lidar_scan(state.x, state.y)
+        cy, sy = np.cos(state.yaw), np.sin(state.yaw)
+        self._lidar_scan(state.x + cy * Car.BACK_TO_CENTER, state.y + sy * Car.BACK_TO_CENTER)
