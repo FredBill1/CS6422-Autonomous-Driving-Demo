@@ -165,7 +165,7 @@ class ModelPredictiveControl:
         self._cur_u = 0.0
         self._u_limit = us[-1]
 
-        self._brake = self._braked = False
+        self._brake = False
 
     def _nearist_point(self, state: Car) -> float:
         "find the nearist point on the reference trajectory to the given state"
@@ -196,25 +196,22 @@ class ModelPredictiveControl:
         while True:
             # interpolate the reference trajectory
             self._cur_u = self._nearist_point(state)
-            if self._brake and not self._braked:
-                self._braked = True
+            if self._brake:
                 self._u_limit = min(self._u_limit, self._cur_u + np.square(state.velocity) / (2 * Car.MAX_ACCEL))
 
             length = max(MIN_HORIZON_DISTANCE, abs(state.velocity) * dt * HORIZON_LENGTH)
             ref_u = np.linspace(self._cur_u, self._cur_u + length, HORIZON_LENGTH + 1)
             ref_u = np.clip(ref_u, a_min=None, a_max=self._u_limit)
             xref = np.array(scipy.interpolate.splev(ref_u, self._tck)).T
-            v = xref[:, 2]
-            if self._brake:
-                v[:] = 0.0
-                return xref
 
             # check if the reference trajectory contains a direction change
+            v = xref[:, 2]
             for i in range(1, len(v)):
                 if v[i] * v[i - 1] < 0:
                     break
-            else:
-                return xref  # if not, return the reference trajectory
+            else:  # if not, return the reference trajectory
+                xref[ref_u == self._u_limit, 2] = 0.0  # make the goal point to have zero velocity
+                return xref
 
             direction_changing_point = self._find_direction_changing_point(ref_u[i - 1], ref_u[i], v[i - 1])
 
