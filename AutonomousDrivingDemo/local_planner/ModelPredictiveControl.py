@@ -9,7 +9,7 @@ import scipy.optimize
 from ..modeling.Car import Car
 from ..utils.wrap_angle import smooth_yaw
 
-NEARIST_POINT_SEARCH_RANGE = 8.0  # [m]
+NEARIST_POINT_SEARCH_RANGE = 20.0  # [m]
 NEARIST_POINT_SEARCH_STEP = 0.1  # [m]
 
 HORIZON_LENGTH = 5  # simulate count
