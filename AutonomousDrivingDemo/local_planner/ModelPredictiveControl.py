@@ -28,10 +28,6 @@ Q_F = Q * 2  # state final matrix
 NX = 4  # [x, y, v, yaw]
 NU = 2  # [accel, steer]
 
-GOAL_MAX_DISTANCE = 1.5  # [m]
-GOAL_YAW_DIFF = np.deg2rad(45.0)  # [rad]
-GOAL_MAX_SPEED = 1.0 / 3.6  # [m/s]
-
 
 def _get_linear_model_matrix(
     velocity: float, yaw: float, steer: float, dt: float
@@ -140,7 +136,6 @@ class MPCResult(NamedTuple):
     controls: npt.NDArray[np.floating[Any]]  # [[accel, steer]], target output controls
     states: npt.NDArray[np.floating[Any]]  # [[x, y, v, yaw]], predicted states
     ref_states: npt.NDArray[np.floating[Any]]  # [[x, y, v, yaw]], reference states on the trajectory
-    goal_reached: bool  # whether the goal is reached
 
 
 class ModelPredictiveControl:
@@ -186,12 +181,15 @@ class ModelPredictiveControl:
                 break
         return min_u
 
-    def _goal_reached(self, state: Car) -> bool:
-        return (
-            np.linalg.norm(self._goal[:2] - [state.x, state.y]) < GOAL_MAX_DISTANCE
-            and abs(wrap_angle(self._goal[2] - state.yaw)) < GOAL_YAW_DIFF
-            and abs(state.velocity) < GOAL_MAX_SPEED
-        )
+    def _find_direction_changing_point(self, u1: float, u2: float, u1_dir: float) -> float:
+        l, r = u1, u2
+        while r - l > 1e-6:
+            m = (l + r) / 2
+            if u1_dir * scipy.interpolate.splev(m, self._tck)[2] < 0:
+                r = m
+            else:
+                l = m
+        return r
 
     def _find_xref(self, state: Car, dt: float) -> npt.NDArray[np.floating[Any]]:
         "Find the closest point in the reference trajectory, and interpolate the reference trajectory within a horizon"
@@ -218,24 +216,17 @@ class ModelPredictiveControl:
             else:
                 return xref  # if not, return the reference trajectory
 
-            # use binary search to find the direction changing point:
-            l, r = ref_u[i - 1], ref_u[i]
-            while r - l > 1e-6:
-                m = (l + r) / 2
-                if xref[0, 2] * scipy.interpolate.splev(m, self._tck)[2] < 0:
-                    r = m
-                else:
-                    l = m
+            direction_changing_point = self._find_direction_changing_point(ref_u[i - 1], ref_u[i], v[i - 1])
 
             # if the direction change happens immediately after the first point, we discard the first point
             # and start to track the trajectory from the direction changing point
             if i <= 1:
-                self._cur_u = r
+                self._cur_u = direction_changing_point
                 continue
 
             # otherwise, we make the direction changing point to have zero velocity, and the vehicle should stop at that point
             xref = xref[:i]
-            xref = np.vstack([xref, np.array(scipy.interpolate.splev(r, self._tck)).T])
+            xref = np.vstack([xref, np.array(scipy.interpolate.splev(direction_changing_point, self._tck)).T])
             xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
             xref[i:, 2] = xref[0, 2]
             xref[-1, 2] = 0.0
@@ -263,7 +254,7 @@ class ModelPredictiveControl:
                 break
         else:
             print("Warning: Cannot converge mpc")
-        return MPCResult(controls, states[:, [0, 1, 3, 2]], xref[:, [0, 1, 3, 2]], self._goal_reached(state))
+        return MPCResult(controls, states[:, [0, 1, 3, 2]], xref[:, [0, 1, 3, 2]])
 
     def brake(self) -> None:
         self._brake = True
