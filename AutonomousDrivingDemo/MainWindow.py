@@ -10,7 +10,7 @@ import numpy.typing as npt
 import pyqtgraph as pg
 from pyqtgraph.dockarea.Dock import Dock
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
-from PySide6.QtCore import Qt, QTimer, Signal, Slot
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QMainWindow
 
@@ -54,6 +54,7 @@ class MainWindow(QMainWindow):
     set_state = Signal(Car)
     set_goal = Signal(Car, Car, Obstacles)
     canceled = Signal()
+    restarted = Signal()
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -66,7 +67,7 @@ class MainWindow(QMainWindow):
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_timestamps: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._reference_points: Optional[npt.NDArray[np.floating[Any]]] = None
-        self._car_simulation_stopped = True
+        self._initing = True
 
         # setup ui
         self._ui = Ui_MainWindow()
@@ -170,10 +171,14 @@ class MainWindow(QMainWindow):
         self._map_server_node.new_obstacle_coordinates.connect(self._trajectory_collision_checking_node.check_collision)
         self._trajectory_collision_checking_node.collided.connect(self._local_planner_node.brake)
         self._trajectory_collision_checking_node.collided.connect(self._trajectory_collided)
-        self.canceled.connect(self._car_simulation_node.stop)
         self.canceled.connect(self._global_planner_node.cancel)
-        self.canceled.connect(self._local_planner_node.cancel)
+        self.canceled.connect(self._local_planner_node.brake)
         self.canceled.connect(self._trajectory_collision_checking_node.cancel)
+        self.restarted.connect(self._car_simulation_node.stop)
+        self.restarted.connect(self._global_planner_node.cancel)
+        self.restarted.connect(self._local_planner_node.cancel)
+        self.restarted.connect(self._map_server_node.init)
+        self.restarted.connect(self._trajectory_collision_checking_node.cancel)
         self.set_goal.connect(self._global_planner_node.plan)
         self.set_state.connect(self._car_simulation_node.set_state)
 
@@ -191,19 +196,21 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def restart(self) -> None:
-        self.cancel()
         self._trajectory_item.setVisible(False)
         self._goal_pose_item.setVisible(False)
-        QTimer.singleShot(0, self._map_server_node.init)
-
-    @Slot()
-    def cancel(self) -> None:
-        self._car_simulation_stopped = True
-        self.canceled.emit()
+        self._goal_unreachable_item.setVisible(False)
         self._clear_global_planner_display_segments()
         self._local_trajectory_item.setData([], [])
         self._reference_points_item.setData([], [])
+        self._initing = True
+        self._reference_points = None
+        self.restarted.emit()
+
+    @Slot()
+    def cancel(self) -> None:
         self._goal_unreachable_item.setVisible(False)
+        self._clear_global_planner_display_segments()
+        self.canceled.emit()
 
     @Slot(MouseDragEvent)
     def _mouse_drag(self, ev: MouseDragEvent) -> None:
@@ -232,7 +239,8 @@ class MainWindow(QMainWindow):
             self._goal_pose_item.setVisible(False)
         elif self._ui.set_goal_button.isChecked():
             self._goal_state = state
-            self.set_goal.emit(self._measured_state, state, Obstacles(self._map_server_node.known_obstacle_coordinates))
+            start = self._measured_state if self._reference_points is None else self._reference_points
+            self.set_goal.emit(start, state, Obstacles(self._map_server_node.known_obstacle_coordinates))
             self._goal_pose_item.set_state(state)
             self._goal_pose_item.setVisible(True)
             self._goal_unreachable_item.setPos(start_x, start_y)
@@ -272,7 +280,7 @@ class MainWindow(QMainWindow):
         if trajectory is not None:
             self._trajectory_item.setData(*trajectory.T[:2])
             self._trajectory_item.setVisible(True)
-            self._car_simulation_stopped = False
+            self._initing = False
         else:
             self._goal_unreachable_item.setVisible(True)
 
@@ -303,13 +311,13 @@ class MainWindow(QMainWindow):
 
     @Slot(np.ndarray)
     def _update_local_trajectory(self, local_trajectory: npt.NDArray[np.floating[Any]]) -> None:
-        if self._car_simulation_stopped:
+        if self._initing:
             return
         self._local_trajectory_item.setData(*local_trajectory.T[:2])
 
     @Slot(np.ndarray)
     def _update_reference_points(self, reference_points: npt.NDArray[np.floating[Any]]) -> None:
-        if self._car_simulation_stopped:
+        if self._initing:
             return
         self._reference_points = reference_points
         self._reference_points_item.setData(*reference_points.T[:2])

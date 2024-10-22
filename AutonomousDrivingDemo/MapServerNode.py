@@ -41,6 +41,7 @@ class MapServerNode(QObject):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
 
+    @Slot()
     def init(self) -> None:
         self._known_obstacle_coordinates = _generate_known_obstacle_coordnates()
         self._unknown_obstacle_coordinates = _generate_unknown_obstacle_coordnates()
