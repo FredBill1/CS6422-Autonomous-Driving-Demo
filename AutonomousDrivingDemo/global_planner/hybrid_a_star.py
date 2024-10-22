@@ -247,23 +247,22 @@ def hybrid_a_star(
             trajectory[0, 3] = trajectory[1, 3]  # set the initial driving direction
         return trajectory
 
-    # A* search (Similar to Dijkstra's algorithm, but with a heuristic cost added)
     if start_is_point:
         start_ijk = calc_ijk(*start)
-        path = SimplePath(start_ijk, np.array([start]), 0, 0.0)
+        start_path = SimplePath(start_ijk, np.array([start]), 0, 0.0)
     else:
         start_ijk = calc_ijk(*start[-1, :3])
-        start[:, 3] = np.sign(start[:, 3])
+        start[:, 3] = np.sign(start[0, 3])
         steer = 0.0
         if start.shape[0] >= 2:
             l = np.linalg.norm(start[-1, :2] - start[-2, :2])
             steer = np.arctan(Car.WHEEL_BASE * (start[-1, 2] - start[-2, 2]) / l)
+        start_path = SimplePath(start_ijk, start, start[0, 3], steer)
+    start_node = Node(start_path, 0.0, H_DIST_COST * heuristic_grid.grid[start_ijk[:2]], None)
 
-        path = SimplePath(start_ijk, start, start[-1, 3], steer)
-    start_node = Node(path, 0.0, H_DIST_COST * heuristic_grid.grid[start_ijk[:2]], None)
     dp[start_ijk] = start_node
     pq = [start_node]
-    while pq:
+    while pq:  # A* search (Similar to Dijkstra's algorithm, but with a heuristic cost added)
         cur = heapq.heappop(pq)
         if isinstance(cur.path, RSPath):
             if cancel_callback is not None and cancel_callback(cur):
