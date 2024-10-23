@@ -1,4 +1,4 @@
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Optional
 
 import cvxpy
 import numpy as np
@@ -75,7 +75,7 @@ def _predict_motion(state: Car, controls: npt.NDArray[np.floating[Any]], dt: flo
 
 def _linear_mpc_control(
     xref: npt.NDArray[np.floating[Any]], xbar: npt.NDArray[np.floating[Any]], last_steer: float, dt: float
-) -> tuple[npt.NDArray[np.floating[Any]], npt.NDArray[np.floating[Any]]]:
+) -> Optional[tuple[npt.NDArray[np.floating[Any]], npt.NDArray[np.floating[Any]]]]:
     """
     The car motion model is approximated as linear on dt, and cvxpy is used to solve the optimal control
     output u after approximation. Recalculate u as the new initial condition, and it will converge to a
