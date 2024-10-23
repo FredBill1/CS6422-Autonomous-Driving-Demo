@@ -237,12 +237,14 @@ class ModelPredictiveControl:
                 xref[i:, 2] = xref[0, 2]
                 xref[-1, 2] = xref[0, 2] * -0.5
 
-            # make the goal point to have a backward velocity, to help brake
-            xref[ref_u == self._u_limit, 2] = xref[0, 2] * -0.5
-
             if self._brake:
                 self._u_limit = ref_u[-1]
                 self._brake = False
+
+            # make the goal point to have zero velocity
+            if ref_u[-1] == self._u_limit:
+                xref[ref_u == self._u_limit, 2] = 0
+                xref[-1, 2] = xref[0, 2] * -0.5
 
             return xref
 
