@@ -52,8 +52,9 @@ class _CustomViewBox(pg.ViewBox):
 
 class MainWindow(QMainWindow):
     set_state = Signal(Car)
-    set_goal = Signal(Car, Car, Obstacles)
     canceled = Signal()
+    set_goal = Signal(Car, Car, Obstacles)
+    braked = Signal()
     restarted = Signal()
 
     def __init__(self, *args, **kwargs) -> None:
@@ -171,14 +172,14 @@ class MainWindow(QMainWindow):
         self._map_server_node.new_obstacle_coordinates.connect(self._trajectory_collision_checking_node.check_collision)
         self._trajectory_collision_checking_node.collided.connect(self._local_planner_node.brake)
         self._trajectory_collision_checking_node.collided.connect(self._trajectory_collided)
+        self.braked.connect(self._global_planner_node.cancel)
+        self.braked.connect(self._local_planner_node.brake)
+        self.braked.connect(self._trajectory_collision_checking_node.cancel)
+        self.canceled.connect(self._car_simulation_node.stop)
         self.canceled.connect(self._global_planner_node.cancel)
-        self.canceled.connect(self._local_planner_node.brake)
+        self.canceled.connect(self._local_planner_node.cancel)
         self.canceled.connect(self._trajectory_collision_checking_node.cancel)
-        self.restarted.connect(self._car_simulation_node.stop)
-        self.restarted.connect(self._global_planner_node.cancel)
-        self.restarted.connect(self._local_planner_node.cancel)
         self.restarted.connect(self._map_server_node.init)
-        self.restarted.connect(self._trajectory_collision_checking_node.cancel)
         self.set_goal.connect(self._global_planner_node.plan)
         self.set_state.connect(self._car_simulation_node.set_state)
 
@@ -196,21 +197,25 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def restart(self) -> None:
+        self.cancel()
         self._trajectory_item.setVisible(False)
-        self._goal_pose_item.setVisible(False)
-        self._goal_unreachable_item.setVisible(False)
-        self._clear_global_planner_display_segments()
-        self._local_trajectory_item.setData([], [])
-        self._reference_points_item.setData([], [])
-        self._initing = True
-        self._reference_points = None
         self.restarted.emit()
 
     @Slot()
     def cancel(self) -> None:
         self._goal_unreachable_item.setVisible(False)
         self._clear_global_planner_display_segments()
+        self._local_trajectory_item.setData([], [])
+        self._reference_points_item.setData([], [])
+        self._initing = True
+        self._reference_points = None
         self.canceled.emit()
+
+    @Slot()
+    def brake(self) -> None:
+        self._goal_unreachable_item.setVisible(False)
+        self._clear_global_planner_display_segments()
+        self.braked.emit()
 
     @Slot(MouseDragEvent)
     def _mouse_drag(self, ev: MouseDragEvent) -> None:
@@ -232,12 +237,14 @@ class MainWindow(QMainWindow):
 
         self._pressed_pose_item.setVisible(False)
         self._trajectory_item.setVisible(False)
-        self.cancel()
 
         if self._ui.set_pose_button.isChecked():
+            self.cancel()
             self.set_state.emit(state)
             self._goal_pose_item.setVisible(False)
+            self.canceled.emit()
         elif self._ui.set_goal_button.isChecked():
+            self.brake()
             self._goal_state = state
             start = self._measured_state if self._reference_points is None else self._reference_points
             self.set_goal.emit(start, state, Obstacles(self._map_server_node.known_obstacle_coordinates))
