@@ -13,7 +13,7 @@ NEARIST_POINT_SEARCH_RANGE = 20.0  # [m]
 NEARIST_POINT_SEARCH_STEP = 0.1  # [m]
 
 HORIZON_LENGTH = 5  # simulate count
-MIN_HORIZON_DISTANCE = 1.0  # [m]
+MIN_HORIZON_DISTANCE = 0.3  # [m]
 
 MAX_ITER = 5
 DU_TH = 0.1  # iteration finish param
