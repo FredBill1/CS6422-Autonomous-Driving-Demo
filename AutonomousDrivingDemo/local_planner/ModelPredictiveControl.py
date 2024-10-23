@@ -21,12 +21,14 @@ DU_TH = 0.1  # iteration finish param
 
 # mpc parameters
 R = np.diag([0.01, 0.005])  # input cost matrix
-R_D = np.diag([1e-5, 10])  # input difference cost matrix
+R_D = np.diag([1e-5, 0.1])  # input difference cost matrix
 Q = np.diag([1.1, 1.1, 0.05, 1.1])  # state cost matrix
 Q_F = Q * 2  # state final matrix
 
 NX = 4  # [x, y, v, yaw]
 NU = 2  # [accel, steer]
+
+DESIRED_MAX_ACCEL_RATIO = 0.7  # desired max acceleration ratio when the vehicle needs to stop
 
 
 def _get_linear_model_matrix(
@@ -170,6 +172,17 @@ class ModelPredictiveControl:
         # calculate the ticks of the reference trajectory
         dists = np.linalg.norm(ref_trajectory[1:, :2] - ref_trajectory[:-1, :2], axis=1)
         u = np.concatenate(([0], np.cumsum(dists)))
+
+        # limit the velocity by max acceleration when the vehicle needs to stop
+        v = ref_trajectory[:, 2]
+        last_zero = None
+        for i in reversed(range(len(v))):
+            if v[i] == 0:
+                last_zero = u[i]
+            elif last_zero is not None:
+                dist = last_zero - u[i]
+                limit = np.sqrt(2 * DESIRED_MAX_ACCEL_RATIO * Car.MAX_ACCEL * dist)
+                v[i] = np.clip(v[i], -limit, limit)
 
         self._direction_changing_us = u[ref_trajectory[:, 2] == 0.0][:-1]
 
