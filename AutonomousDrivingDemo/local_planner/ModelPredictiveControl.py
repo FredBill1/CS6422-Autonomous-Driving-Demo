@@ -211,8 +211,6 @@ class ModelPredictiveControl:
         "find the closest point in the reference trajectory, and interpolate the reference trajectory within a horizon"
         while True:
             self._cur_u = self._nearist_point(state)
-            if self._brake:
-                self._u_limit = min(self._u_limit, self._cur_u + np.square(state.velocity) / (2 * Car.MAX_ACCEL))
 
             # interpolate the reference trajectory
             length = max(MIN_HORIZON_DISTANCE, abs(state.velocity) * dt * HORIZON_LENGTH)
@@ -241,6 +239,11 @@ class ModelPredictiveControl:
 
             # make the goal point to have a backward velocity, to help brake
             xref[ref_u == self._u_limit, 2] = xref[0, 2] * -0.5
+
+            if self._brake:
+                self._u_limit = ref_u[-1]
+                self._brake = False
+
             return xref
 
     def update(self, state: Car, dt: float) -> MPCResult:
