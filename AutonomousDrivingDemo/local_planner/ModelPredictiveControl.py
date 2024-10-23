@@ -21,7 +21,7 @@ DU_TH = 0.1  # iteration finish param
 
 # mpc parameters
 R = np.diag([0.01, 0.005])  # input cost matrix
-R_D = np.diag([1e-5, 10.0])  # input difference cost matrix
+R_D = np.diag([1e-5, 0.01])  # input difference cost matrix
 Q = np.diag([1.1, 1.1, 0.05, 1.1])  # state cost matrix
 Q_F = Q * 2  # state final matrix
 
@@ -141,21 +141,25 @@ class MPCResult(NamedTuple):
 class ModelPredictiveControl:
     def __init__(self, ref_trajectory: npt.NDArray[np.floating[Any]]) -> None:
         assert ref_trajectory.shape[1] == 4, "Reference trajectory have [[x, y, yaw, direction], ...]"
+        assert (ref_trajectory[:, 3] != 0).all(), "the direction on each point of the trajectory should not be zero"
         ref_trajectory[:, 2] = smooth_yaw(ref_trajectory[:, 2])
-        v = ref_trajectory[:, 3]
-        v[:-1][v[1:] * v[:-1] < 0] = 0.0  # make the vehicle stop at the direction changing point
 
-        # remove the consecutive direction changing points
-        mask = v == 0
-        mask = ~(mask & (np.roll(mask, 1) | np.roll(mask, -1)))
-        mask[0] = mask[-1] = True
-
-        v *= Car.TARGET_SPEED  # make the target velocity at each point of the trajectory to be TARGET_SPEED
-        self._goal = ref_trajectory[-1]
+        trajectory = [ref_trajectory[0]]
+        for i, point in enumerate(ref_trajectory[1:], 1):
+            if (last_point := trajectory[-1])[3] != point[3]:  # last_point is a direction changing point
+                assert i > 1, "The first point of the trajectory should not be a direction changing point"
+                # set the direction changing point to have zero velocity, and add two points having non-zero velocity on the two sides of it
+                trajectory[-1] = (last_point + trajectory[-2]) / 2
+                trajectory.append(last_point)
+                trajectory.append((point + last_point) / 2)
+                trajectory[-2][3], trajectory[-1][3] = 0.0, point[3]
+            trajectory.append(point)
+        trajectory[-1][3] = 0.0  # make the goal point to have zero velocity
+        ref_trajectory = np.vstack(trajectory)
+        ref_trajectory[:, 3] *= Car.TARGET_SPEED
 
         # [x, y, yaw, v] -> [x, y, v, yaw]
         ref_trajectory = ref_trajectory[:, [0, 1, 3, 2]]
-        ref_trajectory = ref_trajectory[mask]
 
         # interpolate the reference trajectory
         dists = np.linalg.norm(ref_trajectory[1:, :2] - ref_trajectory[:-1, :2], axis=1)
