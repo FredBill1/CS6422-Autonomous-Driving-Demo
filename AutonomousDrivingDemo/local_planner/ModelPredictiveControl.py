@@ -21,7 +21,7 @@ DU_TH = 0.1  # iteration finish param
 
 # mpc parameters
 R = np.diag([0.01, 0.005])  # input cost matrix
-R_D = np.diag([1e-5, 0.01])  # input difference cost matrix
+R_D = np.diag([1e-5, 10])  # input difference cost matrix
 Q = np.diag([1.1, 1.1, 0.05, 1.1])  # state cost matrix
 Q_F = Q * 2  # state final matrix
 
@@ -142,6 +142,12 @@ class ModelPredictiveControl:
     def __init__(self, ref_trajectory: npt.NDArray[np.floating[Any]]) -> None:
         assert ref_trajectory.shape[1] == 4, "Reference trajectory have [[x, y, yaw, direction], ...]"
         assert (ref_trajectory[:, 3] != 0).all(), "the direction on each point of the trajectory should not be zero"
+
+        # remove consecutive identical points
+        xy = ref_trajectory[:, :2]
+        mask = (xy[:-1] != xy[1:]).any(axis=1)
+        ref_trajectory = ref_trajectory[np.concatenate(([True], mask))]
+
         ref_trajectory[:, 2] = smooth_yaw(ref_trajectory[:, 2])
 
         trajectory = [ref_trajectory[0]]
@@ -161,9 +167,11 @@ class ModelPredictiveControl:
         # [x, y, yaw, v] -> [x, y, v, yaw]
         ref_trajectory = ref_trajectory[:, [0, 1, 3, 2]]
 
-        # interpolate the reference trajectory
+        # calculate the ticks of the reference trajectory
         dists = np.linalg.norm(ref_trajectory[1:, :2] - ref_trajectory[:-1, :2], axis=1)
         u = np.concatenate(([0], np.cumsum(dists)))
+
+        # interpolate the reference trajectory
         self._tck, us = scipy.interpolate.splprep(ref_trajectory.T, s=0, k=1, u=u)
         self._cur_u = 0.0
         self._u_limit = us[-1]
