@@ -237,10 +237,10 @@ class ModelPredictiveControl:
                 xref = np.vstack([xref, np.array(scipy.interpolate.splev(changing_point, self._tck)).T])
                 xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
                 xref[i:, 2] = xref[0, 2]
-                xref[-1, 2] = 0.0
+                xref[-1, 2] = xref[0, 2] * -0.5
 
-            # make the goal point to have zero velocity
-            xref[ref_u == self._u_limit, 2] = 0.0
+            # make the goal point to have a backward velocity, to help brake
+            xref[ref_u == self._u_limit, 2] = xref[0, 2] * -0.5
             return xref
 
     def update(self, state: Car, dt: float) -> MPCResult:
