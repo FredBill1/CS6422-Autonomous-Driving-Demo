@@ -37,7 +37,7 @@ def _worker_process(pipe: Connection, segment_collection_size: int) -> None:
                 def callback(node: Node) -> bool:
                     display_segments.append(node.get_plot_trajectory())
                     if len(display_segments) < segment_collection_size:
-                        return
+                        return False
                     if pipe.poll():
                         return True
                     pipe.send((_WorkerMsgType.DISPLAY_SEGMENTS, display_segments))
