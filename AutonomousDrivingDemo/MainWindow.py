@@ -36,7 +36,7 @@ LOCAL_PLANNER_UPDATE_INTERVAL = 0.2
 
 DASHBOARD_HISTORY_SIZE = 250
 
-REPLAN_REFERENCE_NUM = 2
+REPLAN_MAX_SPEED = 5 / 3.6  # m/s
 
 
 class _CustomViewBox(pg.ViewBox):
@@ -247,7 +247,9 @@ class MainWindow(QMainWindow):
         elif self._ui.set_goal_button.isChecked():
             self.brake()
             self._goal_state = state
-            start = self._measured_state if self._reference_points is None else self._reference_points
+            start = self._measured_state
+            if start.velocity > REPLAN_MAX_SPEED and self._reference_points is not None:
+                start = self._reference_points
             self.set_goal.emit(start, state, Obstacles(self._map_server_node.known_obstacle_coordinates))
             self._goal_pose_item.set_state(state)
             self._goal_pose_item.setVisible(True)
