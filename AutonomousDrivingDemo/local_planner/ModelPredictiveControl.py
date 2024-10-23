@@ -213,7 +213,8 @@ class ModelPredictiveControl:
             self._cur_u = self._nearist_point(state)
 
             # interpolate the reference trajectory
-            length = max(MIN_HORIZON_DISTANCE, abs(state.velocity) * dt * HORIZON_LENGTH)
+            v = np.sign(scipy.interpolate.splev(self._cur_u, self._tck)[2]) * state.velocity
+            length = max(MIN_HORIZON_DISTANCE, max(0, v) * dt * HORIZON_LENGTH)
             ref_u = np.linspace(self._cur_u, self._cur_u + length, HORIZON_LENGTH + 1)
             ref_u = np.clip(ref_u, a_min=None, a_max=self._u_limit)
             xref = np.array(scipy.interpolate.splev(ref_u, self._tck)).T
