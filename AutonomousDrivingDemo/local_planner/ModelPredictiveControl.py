@@ -171,6 +171,8 @@ class ModelPredictiveControl:
         dists = np.linalg.norm(ref_trajectory[1:, :2] - ref_trajectory[:-1, :2], axis=1)
         u = np.concatenate(([0], np.cumsum(dists)))
 
+        self._direction_changing_us = u[ref_trajectory[:, 2] == 0.0][:-1]
+
         # interpolate the reference trajectory
         self._tck, us = scipy.interpolate.splprep(ref_trajectory.T, s=0, k=1, u=u)
         self._cur_u = 0.0
@@ -192,52 +194,40 @@ class ModelPredictiveControl:
                 break
         return min_u
 
-    def _find_direction_changing_point(self, u1: float, u2: float, u1_dir: float) -> float:
-        l, r = u1, u2
-        while r - l > 1e-6:
-            m = (l + r) / 2
-            if u1_dir * scipy.interpolate.splev(m, self._tck)[2] < 0:
-                r = m
-            else:
-                l = m
-        return r
-
     def _find_xref(self, state: Car, dt: float) -> npt.NDArray[np.floating[Any]]:
-        "Find the closest point in the reference trajectory, and interpolate the reference trajectory within a horizon"
+        "find the closest point in the reference trajectory, and interpolate the reference trajectory within a horizon"
         while True:
-            # interpolate the reference trajectory
             self._cur_u = self._nearist_point(state)
             if self._brake:
                 self._u_limit = min(self._u_limit, self._cur_u + np.square(state.velocity) / (2 * Car.MAX_ACCEL))
 
+            # interpolate the reference trajectory
             length = max(MIN_HORIZON_DISTANCE, abs(state.velocity) * dt * HORIZON_LENGTH)
             ref_u = np.linspace(self._cur_u, self._cur_u + length, HORIZON_LENGTH + 1)
             ref_u = np.clip(ref_u, a_min=None, a_max=self._u_limit)
             xref = np.array(scipy.interpolate.splev(ref_u, self._tck)).T
 
-            # check if the reference trajectory contains a direction change
-            v = xref[:, 2]
-            for i in range(1, len(v)):
-                if v[i] * v[i - 1] < 0:
-                    break
-            else:  # if not, return the reference trajectory
-                xref[ref_u == self._u_limit, 2] = 0.0  # make the goal point to have zero velocity
-                return xref
+            # self._direction_changing_us[i - 1] <= self._cur_u < self._direction_changing_us[i]
+            i = np.searchsorted(self._direction_changing_us, self._cur_u, side="right")
+            changing_point = self._direction_changing_us[i] if i < len(self._direction_changing_us) else np.inf
+            if ref_u[-1] >= changing_point:  # if the reference trajectory contains a direction change
 
-            direction_changing_point = self._find_direction_changing_point(ref_u[i - 1], ref_u[i], v[i - 1])
+                # if the direction change happens immediately after the first point, we discard the first point
+                # and start to track the trajectory from the direction changing point
+                if ref_u[1] >= changing_point:
+                    self._cur_u = changing_point
+                    continue
 
-            # if the direction change happens immediately after the first point, we discard the first point
-            # and start to track the trajectory from the direction changing point
-            if i <= 1:
-                self._cur_u = direction_changing_point
-                continue
+                # otherwise, we make the direction changing point to have zero velocity, and the vehicle should stop at that point
+                i = np.searchsorted(ref_u, changing_point, side="right")
+                xref = xref[:i]
+                xref = np.vstack([xref, np.array(scipy.interpolate.splev(changing_point, self._tck)).T])
+                xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
+                xref[i:, 2] = xref[0, 2]
+                xref[-1, 2] = 0.0
 
-            # otherwise, we make the direction changing point to have zero velocity, and the vehicle should stop at that point
-            xref = xref[:i]
-            xref = np.vstack([xref, np.array(scipy.interpolate.splev(direction_changing_point, self._tck)).T])
-            xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
-            xref[i:, 2] = xref[0, 2]
-            xref[-1, 2] = 0.0
+            # make the goal point to have zero velocity
+            xref[ref_u == self._u_limit, 2] = 0.0
             return xref
 
     def update(self, state: Car, dt: float) -> MPCResult:
