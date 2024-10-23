@@ -1,4 +1,3 @@
-import multiprocessing as mp
 from enum import Enum, auto
 from multiprocessing.connection import Connection
 from typing import Any, Optional
@@ -10,8 +9,7 @@ from PySide6.QtCore import QObject, QThread, Signal, Slot
 from .global_planner.hybrid_a_star import Node, hybrid_a_star
 from .modeling.Car import Car
 from .modeling.Obstacles import Obstacles
-from .utils.PipeRecvWorker import PipeRecvWorker
-from .utils.set_high_priority import set_high_priority
+from .utils.ProcessWithPipe import ProcessWithPipe
 
 
 class _ParentMsgType(Enum):
@@ -58,16 +56,12 @@ class GlobalPlannerNode(QObject):
 
     def __init__(self, segment_collection_size: int, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self._parent_pipe, self._child_pipe = mp.Pipe()
-        self._worker = mp.Process(target=_worker_process, args=(self._child_pipe, segment_collection_size), daemon=True)
-        self._recv_worker = PipeRecvWorker(self._parent_pipe, parent=self)
-        self._recv_worker.recv.connect(self._worker_recv)
+        self._worker = ProcessWithPipe(_worker_process, args=(segment_collection_size,), parent=self)
+        self._worker.recv.connect(self._worker_recv)
 
     @Slot()
     def start(self) -> None:
-        self._worker.start()
-        set_high_priority(self._worker.pid)
-        self._recv_worker.start(QThread.Priority.HighestPriority)
+        self._worker.start(QThread.Priority.HighestPriority)
 
     @Slot(object, Car, Obstacles)
     def plan(self, start_state: Car | npt.NDArray[np.floating[Any]], goal_state: Car, obstacles: Obstacles) -> None:
@@ -76,11 +70,11 @@ class GlobalPlannerNode(QObject):
         else:
             start = start_state
         goal = np.array([goal_state.x, goal_state.y, goal_state.yaw])
-        self._parent_pipe.send((_ParentMsgType.PLAN, start, goal, obstacles))
+        self._worker.send((_ParentMsgType.PLAN, start, goal, obstacles))
 
     @Slot()
     def cancel(self) -> None:
-        self._parent_pipe.send(_ParentMsgType.CANCEL)
+        self._worker.send(_ParentMsgType.CANCEL)
 
     @Slot(object)
     def _worker_recv(self, data) -> None:

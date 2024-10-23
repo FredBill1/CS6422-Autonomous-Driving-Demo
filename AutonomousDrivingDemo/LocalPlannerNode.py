@@ -1,4 +1,3 @@
-import multiprocessing as mp
 from enum import Enum, auto
 from multiprocessing.connection import Connection
 from typing import Any, Optional
@@ -9,8 +8,7 @@ from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
 
 from .local_planner.ModelPredictiveControl import ModelPredictiveControl, MPCResult
 from .modeling.Car import Car
-from .utils.PipeRecvWorker import PipeRecvWorker
-from .utils.set_high_priority import set_high_priority
+from .utils.ProcessWithPipe import ProcessWithPipe
 
 
 class _ParentMsgType(Enum):
@@ -47,10 +45,8 @@ class LocalPlannerNode(QObject):
         super().__init__(parent)
         self._state: Optional[tuple[float, Car]] = None
         self._delta_time_s = delta_time_s
-        self._parent_pipe, self._child_pipe = mp.Pipe()
-        self._worker = mp.Process(target=_worker_process, args=(self._child_pipe, delta_time_s), daemon=True)
-        self._recv_worker = PipeRecvWorker(self._parent_pipe, parent=self)
-        self._recv_worker.recv.connect(self._worker_recv)
+        self._worker = ProcessWithPipe(_worker_process, args=(delta_time_s,), parent=self)
+        self._worker.recv.connect(self._worker_recv)
 
         self._update_timer = QTimer(self)
         self._update_timer.timeout.connect(self._update)
@@ -59,9 +55,7 @@ class LocalPlannerNode(QObject):
 
     @Slot()
     def start(self) -> None:
-        self._worker.start()
-        set_high_priority(self._worker.pid)
-        self._recv_worker.start(QThread.Priority.HighestPriority)
+        self._worker.start(QThread.Priority.HighestPriority)
         self._update_timer.start()
 
     @Slot(float, Car)
@@ -71,22 +65,22 @@ class LocalPlannerNode(QObject):
     @Slot(np.ndarray)
     def set_trajectory(self, trajectory: Optional[npt.NDArray[np.floating[Any]]]) -> None:
         if trajectory is not None:
-            self._parent_pipe.send((_ParentMsgType.TRAJECTORY, trajectory))
+            self._worker.send((_ParentMsgType.TRAJECTORY, trajectory))
         else:
-            self._parent_pipe.send(_ParentMsgType.BRAKE)
+            self._worker.send(_ParentMsgType.BRAKE)
 
     @Slot()
     def brake(self) -> None:
-        self._parent_pipe.send(_ParentMsgType.BRAKE)
+        self._worker.send(_ParentMsgType.BRAKE)
 
     @Slot()
     def cancel(self) -> None:
-        self._parent_pipe.send(_ParentMsgType.CANCEL)
+        self._worker.send(_ParentMsgType.CANCEL)
 
     @Slot()
     def _update(self) -> None:
         if self._state is not None:
-            self._parent_pipe.send((_ParentMsgType.STATE, self._state))
+            self._worker.send((_ParentMsgType.STATE, self._state))
 
     @Slot(tuple)
     def _worker_recv(self, data: tuple[float, Car, MPCResult]) -> None:
