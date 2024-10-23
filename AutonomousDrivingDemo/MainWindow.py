@@ -198,6 +198,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def restart(self) -> None:
         self.cancel()
+        self._goal_pose_item.setVisible(False)
         self._trajectory_item.setVisible(False)
         self.restarted.emit()
 
