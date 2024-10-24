@@ -67,7 +67,7 @@ class MainWindow(QMainWindow):
         self._measured_velocities: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_steers: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
         self._measured_timestamps: deque[float] = deque([0.0], maxlen=DASHBOARD_HISTORY_SIZE)
-        self._reference_points: Optional[npt.NDArray[np.floating[Any]]] = None
+        self._brake_trajectory: Optional[npt.NDArray[np.floating[Any]]] = None
         self._initing = True
 
         # setup ui
@@ -160,6 +160,7 @@ class MainWindow(QMainWindow):
         self._global_planner_node.trajectory.connect(self._local_planner_node.set_trajectory)
         self._global_planner_node.trajectory.connect(self._trajectory_collision_checking_node.set_trajectory)
         self._global_planner_node.trajectory.connect(self._update_trajectory)
+        self._local_planner_node.brake_trajectory.connect(self._update_brake_trajectory)
         self._local_planner_node.control_sequence.connect(self._car_simulation_node.set_control_sequence)
         self._local_planner_node.local_trajectory.connect(self._update_local_trajectory)
         self._local_planner_node.reference_points.connect(self._update_reference_points)
@@ -209,7 +210,7 @@ class MainWindow(QMainWindow):
         self._local_trajectory_item.setData([], [])
         self._reference_points_item.setData([], [])
         self._initing = True
-        self._reference_points = None
+        self._brake_trajectory = None
         self.canceled.emit()
 
     @Slot()
@@ -240,20 +241,22 @@ class MainWindow(QMainWindow):
         self._trajectory_item.setVisible(False)
 
         if self._ui.set_pose_button.isChecked():
+            self._goal_pose_item.setVisible(False)
             self.cancel()
             self.set_state.emit(state)
-            self._goal_pose_item.setVisible(False)
-            self.canceled.emit()
         elif self._ui.set_goal_button.isChecked():
-            self.brake()
             self._goal_state = state
-            start = self._measured_state
-            if start.velocity > REPLAN_MAX_SPEED and self._reference_points is not None:
-                start = self._reference_points
-            self.set_goal.emit(start, state, Obstacles(self._map_server_node.known_obstacle_coordinates))
             self._goal_pose_item.set_state(state)
             self._goal_pose_item.setVisible(True)
             self._goal_unreachable_item.setPos(start_x, start_y)
+            self.brake()
+            self._plan()
+
+    def _plan(self) -> None:
+        start = self._measured_state
+        if abs(start.velocity) > REPLAN_MAX_SPEED and self._brake_trajectory is not None:
+            start = self._brake_trajectory
+        self.set_goal.emit(start, self._goal_state, Obstacles(self._map_server_node.known_obstacle_coordinates))
 
     def _inited(self, _: Car) -> None:
         self._known_obstacles_item.setData(*self._map_server_node.known_obstacle_coordinates.T)
@@ -262,9 +265,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def _trajectory_collided(self) -> None:
         self._trajectory_item.setVisible(False)
-        self.set_goal.emit(
-            self._reference_points, self._goal_state, Obstacles(self._map_server_node.known_obstacle_coordinates)
-        )
+        self._plan()
 
     @Slot(list)
     def _update_global_planner_display_segments(self, display_segments: list[npt.NDArray[np.floating[Any]]]) -> None:
@@ -329,5 +330,8 @@ class MainWindow(QMainWindow):
     def _update_reference_points(self, reference_points: npt.NDArray[np.floating[Any]]) -> None:
         if self._initing:
             return
-        self._reference_points = reference_points
         self._reference_points_item.setData(*reference_points.T[:2])
+
+    @Slot(np.ndarray)
+    def _update_brake_trajectory(self, brake_trajectory: npt.NDArray[np.floating[Any]]) -> None:
+        self._brake_trajectory = brake_trajectory

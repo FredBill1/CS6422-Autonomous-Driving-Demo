@@ -40,6 +40,7 @@ class LocalPlannerNode(QObject):
     control_sequence = Signal(tuple)
     local_trajectory = Signal(np.ndarray)
     reference_points = Signal(np.ndarray)
+    brake_trajectory = Signal(np.ndarray)
 
     def __init__(self, delta_time_s: float, update_interval_s: float, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -92,3 +93,4 @@ class LocalPlannerNode(QObject):
         self.control_sequence.emit(control_sequence)
         self.local_trajectory.emit(result.states[:, :2])
         self.reference_points.emit(result.ref_states)
+        self.brake_trajectory.emit(result.brake_trajectory)
