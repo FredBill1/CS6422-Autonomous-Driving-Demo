@@ -258,7 +258,7 @@ class ModelPredictiveControl:
                 xref[-1, 2] = state.velocity * -0.5
             elif ref_u[-1] == self._u_limit:
                 # make the goal point to have zero velocity
-                xref[ref_u == self._u_limit, 2] = 0
+                xref[ref_u == self._u_limit, 2] = 0.0
                 xref[-1, 2] = state.velocity * -0.5
 
             return xref
