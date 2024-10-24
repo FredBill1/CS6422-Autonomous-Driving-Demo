@@ -243,8 +243,7 @@ def hybrid_a_star(
             node = node.parent
         segments.reverse()
         trajectory = np.vstack(segments)
-        if trajectory.shape[0] > 1:
-            trajectory[0, 3] = trajectory[1, 3]  # set the initial driving direction
+        trajectory[0, 3] = trajectory[1, 3] if trajectory.shape[0] > 1 else 1  # set the initial driving direction
         return trajectory
 
     if start_is_point:
