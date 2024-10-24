@@ -240,7 +240,7 @@ class ModelPredictiveControl:
 
             if self._brake:
                 if not self._braked:
-                    brake_length = np.square(state.velocity) / (2 * Car.MAX_ACCEL)
+                    brake_length = np.square(state.velocity) / (2 * Car.MAX_ACCEL * DESIRED_MAX_ACCEL_RATIO)
                     self._u_limit = min(self._u_limit, self._cur_u + brake_length, changing_point)
                     self._braked = True
                 xref[:, 2] = 0.0
