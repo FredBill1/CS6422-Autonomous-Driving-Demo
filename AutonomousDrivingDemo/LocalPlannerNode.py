@@ -1,10 +1,10 @@
 from enum import Enum, auto
 from multiprocessing.connection import Connection
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 import numpy as np
 import numpy.typing as npt
-from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QThread, QTimerEvent, Signal, Slot
 
 from .local_planner.ModelPredictiveControl import ModelPredictiveControl, MPCResult
 from .modeling.Car import Car
@@ -48,16 +48,12 @@ class LocalPlannerNode(QObject):
         self._delta_time_s = delta_time_s
         self._worker = ProcessWithPipe(_worker_process, args=(delta_time_s,), parent=self)
         self._worker.recv.connect(self._worker_recv)
-
-        self._update_timer = QTimer(self)
-        self._update_timer.timeout.connect(self._update)
-        self._update_timer.setTimerType(Qt.TimerType.PreciseTimer)
-        self._update_timer.setInterval(int(update_interval_s * 1000))
+        self._update_interval_s = int(update_interval_s * 1000)
 
     @Slot()
     def start(self) -> None:
         self._worker.start(QThread.Priority.HighestPriority)
-        self._update_timer.start()
+        self.startTimer(self._update_interval_s, Qt.TimerType.PreciseTimer)
 
     @Slot(float, Car)
     def set_state(self, timestamp_s: float, state: Car) -> None:
@@ -78,8 +74,8 @@ class LocalPlannerNode(QObject):
     def cancel(self) -> None:
         self._worker.send(_ParentMsgType.CANCEL)
 
-    @Slot()
-    def _update(self) -> None:
+    @override
+    def timerEvent(self, _: QTimerEvent) -> None:
         if self._state is not None:
             self._worker.send((_ParentMsgType.STATE, self._state))
 

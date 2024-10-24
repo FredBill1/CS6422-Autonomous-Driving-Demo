@@ -1,9 +1,9 @@
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 import numpy as np
 import numpy.typing as npt
 import scipy.interpolate
-from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QTimerEvent, Signal, Slot
 
 from .modeling.Car import Car
 
@@ -16,7 +16,7 @@ class CarSimulationNode(QObject):
         self,
         delta_time_s: float,
         simulation_interval_s: float,
-        simulation_publish_interval_s: float,
+        publish_interval_s: float,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
@@ -27,15 +27,19 @@ class CarSimulationNode(QObject):
         self._timestamp_s = 0.0
         self._stopped = True
 
-        self._simulation_timer = QTimer(self)
-        self._simulation_timer.timeout.connect(self._simulate)
-        self._simulation_timer.setTimerType(Qt.TimerType.PreciseTimer)
-        self._simulation_timer.setInterval(int(simulation_interval_s * 1000))
+        self._simulation_interval_s = int(simulation_interval_s * 1000)
+        self._simulation_timer_id = None
 
-        self._simulation_publish_timer = QTimer(self)
-        self._simulation_publish_timer.timeout.connect(self._publish_state)
-        self._simulation_publish_timer.setTimerType(Qt.TimerType.PreciseTimer)
-        self._simulation_publish_timer.setInterval(int(simulation_publish_interval_s * 1000))
+        self._publish_interval_s = int(publish_interval_s * 1000)
+        self._publish_timer_id = None
+
+    @override
+    def timerEvent(self, event: QTimerEvent) -> None:
+        match event.timerId():
+            case self._simulation_timer_id:
+                self._simulate()
+            case self._publish_timer_id:
+                self._publish_state()
 
     @Slot()
     def _simulate(self):
@@ -55,8 +59,8 @@ class CarSimulationNode(QObject):
 
     @Slot()
     def start(self):
-        self._simulation_timer.start()
-        self._simulation_publish_timer.start()
+        self._publish_timer_id = self.startTimer(self._publish_interval_s, Qt.TimerType.PreciseTimer)
+        self._simulation_timer_id = self.startTimer(self._simulation_interval_s, Qt.TimerType.PreciseTimer)
 
     @Slot(np.ndarray)
     def set_control_sequence(self, control_sequence: npt.NDArray[Any]) -> None:

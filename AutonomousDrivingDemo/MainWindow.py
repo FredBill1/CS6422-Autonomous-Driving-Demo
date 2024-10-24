@@ -140,7 +140,7 @@ class MainWindow(QMainWindow):
         self._car_simulation_node = CarSimulationNode(
             delta_time_s=SIMULATION_DELTA_TIME,
             simulation_interval_s=SIMULATION_INTERVAL,
-            simulation_publish_interval_s=SIMULATION_PUBLISH_INTERVAL,
+            publish_interval_s=SIMULATION_PUBLISH_INTERVAL,
         )
         self._global_planner_node = GlobalPlannerNode(
             segment_collection_size=GLOBAL_PLANNER_SEGMENT_COLLECTION_SIZE,
