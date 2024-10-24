@@ -236,18 +236,19 @@ class ModelPredictiveControl:
                 xref = np.vstack([xref, np.array(scipy.interpolate.splev(changing_point, self._tck)).T])
                 xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
                 xref[i:, 2] = xref[0, 2]
-                xref[-1, 2] = xref[0, 2] * -0.5
+                xref[-1, 2] = state.velocity * -0.5
 
             if self._brake:
                 if not self._braked:
-                    self._u_limit = ref_u[-1]
+                    brake_length = np.square(state.velocity) / (2 * Car.MAX_ACCEL)
+                    self._u_limit = min(self._u_limit, self._cur_u + brake_length, changing_point)
                     self._braked = True
                 xref[:, 2] = 0.0
-
-            # make the goal point to have zero velocity
-            if ref_u[-1] == self._u_limit:
+                xref[-1, 2] = state.velocity * -0.5
+            elif ref_u[-1] == self._u_limit:
+                # make the goal point to have zero velocity
                 xref[ref_u == self._u_limit, 2] = 0
-                xref[-1, 2] = xref[0, 2] * -0.5
+                xref[-1, 2] = state.velocity * -0.5
 
             return xref
 
