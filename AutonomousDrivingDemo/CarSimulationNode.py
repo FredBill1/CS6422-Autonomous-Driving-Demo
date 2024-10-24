@@ -27,10 +27,10 @@ class CarSimulationNode(QObject):
         self._timestamp_s = 0.0
         self._stopped = True
 
-        self._simulation_interval_s = int(simulation_interval_s * 1000)
+        self._simulation_interval = int(simulation_interval_s * 1000)
         self._simulation_timer_id = None
 
-        self._publish_interval_s = int(publish_interval_s * 1000)
+        self._publish_interval = int(publish_interval_s * 1000)
         self._publish_timer_id = None
 
     @override
@@ -59,8 +59,8 @@ class CarSimulationNode(QObject):
 
     @Slot()
     def start(self):
-        self._publish_timer_id = self.startTimer(self._publish_interval_s, Qt.TimerType.PreciseTimer)
-        self._simulation_timer_id = self.startTimer(self._simulation_interval_s, Qt.TimerType.PreciseTimer)
+        self._publish_timer_id = self.startTimer(self._publish_interval, Qt.TimerType.PreciseTimer)
+        self._simulation_timer_id = self.startTimer(self._simulation_interval, Qt.TimerType.PreciseTimer)
 
     @Slot(np.ndarray)
     def set_control_sequence(self, control_sequence: npt.NDArray[Any]) -> None:

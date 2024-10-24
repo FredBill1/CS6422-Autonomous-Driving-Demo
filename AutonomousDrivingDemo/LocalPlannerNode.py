@@ -48,12 +48,12 @@ class LocalPlannerNode(QObject):
         self._delta_time_s = delta_time_s
         self._worker = ProcessWithPipe(_worker_process, args=(delta_time_s,), parent=self)
         self._worker.recv.connect(self._worker_recv)
-        self._update_interval_s = int(update_interval_s * 1000)
+        self._update_interval = int(update_interval_s * 1000)
 
     @Slot()
     def start(self) -> None:
         self._worker.start(QThread.Priority.HighestPriority)
-        self.startTimer(self._update_interval_s, Qt.TimerType.PreciseTimer)
+        self.startTimer(self._update_interval, Qt.TimerType.PreciseTimer)
 
     @Slot(float, Car)
     def set_state(self, timestamp_s: float, state: Car) -> None:
