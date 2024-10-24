@@ -148,13 +148,13 @@ def hybrid_a_star(
         switch_direction_cost = (
             SWITCH_DIRECTION_COST if cur.path.direction != 0 and direction != cur.path.direction else 0.0
         )
-        steer_change_cost = STEER_CHANGE_COST * np.abs(steer - cur.path.steer)
-        steer_cost = STEER_COST * np.abs(steer) * MOTION_DISTANCE
+        steer_change_cost = STEER_CHANGE_COST * abs(steer - cur.path.steer)
+        steer_cost = STEER_COST * abs(steer) * MOTION_DISTANCE
         cost = cur.cost + distance_cost + switch_direction_cost + steer_change_cost + steer_cost
 
         # Calculate the heuristic cost from this neighbour node to the goal
         h_dist_cost = H_DIST_COST * heuristic_grid.grid[i, j]
-        h_yaw_cost = H_YAW_COST * np.abs(wrap_angle(goal[2] - car.yaw))
+        h_yaw_cost = H_YAW_COST * abs(wrap_angle(goal[2] - car.yaw))
         h_cost = h_dist_cost + h_yaw_cost
 
         return Node(SimplePath((i, j, k), np.array(trajectory), direction, steer), cost, h_cost, cur)
@@ -201,9 +201,9 @@ def hybrid_a_star(
                     switch_direction_cost += SWITCH_DIRECTION_COST
                 last_direction = segment.direction
                 steer = {"left": Car.TARGET_MAX_STEER, "right": -Car.TARGET_MAX_STEER, "straight": 0.0}[segment.type]
-                steer_change_cost += STEER_CHANGE_COST * np.abs(steer - last_steer)
+                steer_change_cost += STEER_CHANGE_COST * abs(steer - last_steer)
                 last_steer = steer
-                steer_cost += STEER_COST * np.abs(steer) * length
+                steer_cost += STEER_COST * abs(steer) * length
             return distance_cost + switch_direction_cost + steer_change_cost + steer_cost
 
         # generate all possible Reeds-Shepp pathes
