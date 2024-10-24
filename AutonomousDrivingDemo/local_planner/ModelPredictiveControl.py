@@ -211,7 +211,7 @@ class ModelPredictiveControl:
                 break
         self._cur_u = min_u
 
-    def _find_xref(self, state: Car, dt: float) -> tuple[npt.NDArray[np.floating[Any]], npt.NDArray[np.floating[Any]]]:
+    def _find_xref(self, state: Car, dt: float) -> npt.NDArray[np.floating[Any]]:
         "find the closest point in the reference trajectory, and interpolate the reference trajectory within a horizon"
         while True:
             self._find_nearist_point(state)
@@ -243,14 +243,17 @@ class ModelPredictiveControl:
                 xref[i:, 2] = xref[0, 2]
                 xref[-1, 2] = state.velocity * -0.5
 
-            brake_length = np.square(state.velocity) / (2 * Car.MAX_ACCEL * DESIRED_MAX_ACCEL_RATIO)
-            brake_limit = min(self._u_limit, self._cur_u + brake_length, changing_point)
-            brake_u = np.arange(self._cur_u, brake_limit + MOTION_RESOLUTION / 2, MOTION_RESOLUTION)
-            brake_trajectory = np.array(scipy.interpolate.splev(brake_u, self._tck)).T
-            brake_trajectory[:, 2] = np.sign(brake_trajectory[:, 2].sum())
+            if not self._braked:
+                brake_length = np.square(state.velocity) / (2 * Car.MAX_ACCEL * DESIRED_MAX_ACCEL_RATIO)
+                brake_limit = min(self._u_limit, self._cur_u + brake_length, changing_point)
+                brake_u = np.arange(self._cur_u, brake_limit + MOTION_RESOLUTION / 2, MOTION_RESOLUTION)
+                self._brake_trajectory = np.array(scipy.interpolate.splev(brake_u, self._tck)).T
+                self._brake_trajectory[:, 2] = np.sign(self._brake_trajectory[:, 2].sum())
+                if self._brake:
+                    self._braked = True
+                    self._u_limit = brake_limit
 
             if self._brake:
-                self._u_limit = brake_limit
                 xref[:, 2] = 0.0
                 xref[-1, 2] = state.velocity * -0.5
             elif ref_u[-1] == self._u_limit:
@@ -258,10 +261,10 @@ class ModelPredictiveControl:
                 xref[ref_u == self._u_limit, 2] = 0
                 xref[-1, 2] = state.velocity * -0.5
 
-            return xref, brake_trajectory
+            return xref
 
     def update(self, state: Car, dt: float) -> MPCResult:
-        xref, brake_trajectory = self._find_xref(state, dt)
+        xref = self._find_xref(state, dt)
 
         # Align the yaw of the vehicle with the reference trajectory, to facilitate the calculation of
         # the yaw difference between the current state and the reference trajectory.
@@ -283,7 +286,9 @@ class ModelPredictiveControl:
         else:
             print("Warning: Cannot converge mpc")
 
-        return MPCResult(controls, states[:, [0, 1, 3, 2]], xref[:, [0, 1, 3, 2]], brake_trajectory[:, [0, 1, 3, 2]])
+        return MPCResult(
+            controls, states[:, [0, 1, 3, 2]], xref[:, [0, 1, 3, 2]], self._brake_trajectory[:, [0, 1, 3, 2]]
+        )
 
     def brake(self) -> None:
         self._brake = True
