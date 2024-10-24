@@ -153,13 +153,15 @@ class ModelPredictiveControl:
         mask = (xy[:-1] != xy[1:]).any(axis=1)
         ref_trajectory = ref_trajectory[np.concatenate(([True], mask))]
 
+        # make the yaw of the reference trajectory smooth, i.e. no sudden change from -pi to pi at each pair of adjacent points
         ref_trajectory[:, 2] = smooth_yaw(ref_trajectory[:, 2])
 
+        # for each direction changing point, we should make the vehicle to have zero velocity at that point,
+        # and add two points having non-zero velocity on the two sides of it
         trajectory = [ref_trajectory[0]]
         for i, point in enumerate(ref_trajectory[1:], 1):
             if (last_point := trajectory[-1])[3] != point[3]:  # last_point is a direction changing point
                 assert i > 1, "The first point of the trajectory should not be a direction changing point"
-                # set the direction changing point to have zero velocity, and add two points having non-zero velocity on the two sides of it
                 trajectory[-1] = (last_point + trajectory[-2]) / 2
                 trajectory.append(last_point)
                 trajectory.append((point + last_point) / 2)
@@ -187,6 +189,7 @@ class ModelPredictiveControl:
                 limit = np.sqrt(2 * DESIRED_MAX_ACCEL_RATIO * Car.MAX_ACCEL * dist)
                 v[i] = np.clip(v[i], -limit, limit)
 
+        # record the points where the direction of the vehicle changes
         self._direction_changing_us = u[ref_trajectory[:, 2] == 0.0][:-1]
 
         # interpolate the reference trajectory
@@ -202,6 +205,7 @@ class ModelPredictiveControl:
         def cost(u: float) -> float:
             return np.linalg.norm(np.array(scipy.interpolate.splev(u, self._tck)[:2]).T - [state.x, state.y])
 
+        # only a simple hill climbing, to make sure every part of the trajectory is not skipped
         min_dist, min_u = np.inf, self._cur_u
         search_limit = min(self._u_limit, self._cur_u + NEARIST_POINT_SEARCH_RANGE)
         for u in np.arange(self._cur_u, search_limit + NEARIST_POINT_SEARCH_STEP / 2, NEARIST_POINT_SEARCH_STEP):
@@ -240,26 +244,26 @@ class ModelPredictiveControl:
                 if len(xref) < HORIZON_LENGTH + 1:
                     xref = np.vstack([xref, np.array(scipy.interpolate.splev(changing_point, self._tck)).T])
                     xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
-                xref[i:, 2] = xref[0, 2]
-                xref[-1, 2] = state.velocity * -0.5
 
             if not self._braked:
+                # when the vehicle has not braked yet, we assume the vehicle needs to brake here and calculate the trajectory for braking
                 brake_length = np.square(state.velocity) / (2 * Car.MAX_ACCEL * DESIRED_MAX_ACCEL_RATIO)
                 brake_limit = min(self._u_limit, self._cur_u + brake_length, changing_point)
                 brake_u = np.arange(self._cur_u, brake_limit + MOTION_RESOLUTION / 2, MOTION_RESOLUTION)
                 self._brake_trajectory = np.array(scipy.interpolate.splev(brake_u, self._tck)).T
                 self._brake_trajectory[:, 2] = np.sign(self._brake_trajectory[:, 2].sum())
                 if self._brake:
+                    # if the vehicle really needs to brake, we make the braking trajectory fixed and prevent further calculation
                     self._braked = True
                     self._u_limit = brake_limit
 
+            # make the stopping point to have zero velocity
             if self._brake:
                 xref[:, 2] = 0.0
-                xref[-1, 2] = state.velocity * -0.5
+                xref[-1, 2] = state.velocity * -0.5  # a negative velocity to help the vehicle brake better
             elif ref_u[-1] == self._u_limit:
-                # make the goal point to have zero velocity
                 xref[ref_u == self._u_limit, 2] = 0.0
-                xref[-1, 2] = state.velocity * -0.5
+                xref[-1, 2] = state.velocity * -0.5  # a negative velocity to help the vehicle brake better
 
             return xref
 
