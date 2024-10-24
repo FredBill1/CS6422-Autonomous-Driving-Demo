@@ -191,7 +191,7 @@ class ModelPredictiveControl:
         self._cur_u = 0.0
         self._u_limit = us[-1]
 
-        self._brake = False
+        self._brake = self._braked = False
 
     def _nearist_point(self, state: Car) -> float:
         "find the nearist point on the reference trajectory to the given state"
@@ -239,8 +239,10 @@ class ModelPredictiveControl:
                 xref[-1, 2] = xref[0, 2] * -0.5
 
             if self._brake:
-                self._u_limit = ref_u[-1]
-                self._brake = False
+                if not self._braked:
+                    self._u_limit = ref_u[-1]
+                    self._braked = True
+                xref[:, 2] = 0.0
 
             # make the goal point to have zero velocity
             if ref_u[-1] == self._u_limit:
