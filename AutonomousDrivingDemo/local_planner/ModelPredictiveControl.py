@@ -233,8 +233,9 @@ class ModelPredictiveControl:
                 # otherwise, we make the direction changing point to have zero velocity, and the vehicle should stop at that point
                 i = np.searchsorted(ref_u, changing_point, side="right")
                 xref = xref[:i]
-                xref = np.vstack([xref, np.array(scipy.interpolate.splev(changing_point, self._tck)).T])
-                xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
+                if len(xref) < HORIZON_LENGTH + 1:
+                    xref = np.vstack([xref, np.array(scipy.interpolate.splev(changing_point, self._tck)).T])
+                    xref = np.pad(xref, ((0, HORIZON_LENGTH + 1 - len(xref)), (0, 0)), mode="edge")
                 xref[i:, 2] = xref[0, 2]
                 xref[-1, 2] = state.velocity * -0.5
 
